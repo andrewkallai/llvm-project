@@ -51,6 +51,9 @@ add_mlir_library(MLIRAnalysis
   DEPENDS
   mlir-headers
 
+  LINK_COMPONENTS
+  Analysis
+
   LINK_LIBS PUBLIC
   MLIRCallInterfaces
   MLIRControlFlowInterfaces

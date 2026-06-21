@@ -18,6 +18,7 @@
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Analysis/MLInlineAdvisor.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
@@ -421,7 +422,7 @@ namespace mlir {
 
 class Inliner::Impl {
 public:
-  Impl(Inliner &inliner) : inliner(inliner) {}
+  Impl(Inliner &inliner) : inliner(inliner), mlAdvisor(inliner.mlAdvisor) {}
 
   /// Attempt to inline calls within the given scc, and run simplifications,
   /// until a fixed point is reached. This allows for the inlining of newly
@@ -459,6 +460,8 @@ private:
   bool shouldInline(ResolvedCall &resolvedCall);
 
 private:
+  /// Optional ML advisor.
+  MLIRInlineAdvisor *mlAdvisor{nullptr};
   Inliner &inliner;
   llvm::SmallVector<llvm::StringMap<OpPassManager>> pipelines;
 };
@@ -744,6 +747,14 @@ bool Inliner::Impl::shouldInline(ResolvedCall &resolvedCall) {
     return false;
 
   // Otherwise, inline.
+  // If an ML advisor is available, also consult it.
+  if (mlAdvisor) {
+    auto advice = mlAdvisor->getAdvice(
+        resolvedCall.call, resolvedCall.sourceNode->getCallableRegion()->getParentOp(),
+        resolvedCall.targetNode->getCallableRegion());
+    if (!advice->isInliningRecommended())
+      return false;
+  }
   return true;
 }
 

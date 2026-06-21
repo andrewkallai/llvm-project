@@ -19,6 +19,9 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Inliner.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/MLInlineAdvisor.h"
+#include "llvm/Analysis/MLModelRunner.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
 #define GEN_PASS_DEF_INLINERPASS
@@ -144,9 +147,25 @@ void InlinerPass::runOnOperation() {
     return isProfitableToInline(call, inliningThreshold);
   };
 
+  std::unique_ptr<MLIRInlineAdvisor> mlAdvisor;
+  if (enableMLInliner) {
+    // When no model path is available, the runner factory returns nullptr,
+    // and the advisor defaults to always recommending inlining.
+    auto runnerFactory =
+        [&](const std::vector<llvm::TensorSpec> &inputFeatures)
+            -> std::unique_ptr<llvm::MLModelRunner> {
+      if (!mlInlinerModelPath.empty())
+        llvm::errs() << "MLIR ML inliner: model path "
+                      << mlInlinerModelPath
+                      << " specified but model loading is not yet implemented.\n";
+      return nullptr;
+    };
+    mlAdvisor =
+        createMLIRInlineAdvisor(op, cg, std::move(runnerFactory));
+  }
   // Get an instance of the inliner.
   Inliner inliner(op, cg, *this, getAnalysisManager(), runPipelineHelper,
-                  config, profitabilityCb);
+                  config, profitabilityCb, mlAdvisor.get());
 
   // Run the inlining.
   if (failed(inliner.doInlining()))

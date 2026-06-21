@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+#include "mlir/Analysis/MLInlineAdvisor.h"
 //===----------------------------------------------------------------------===//
 //
 // This file implements the interface between the MLIR inliner and a learned
@@ -35,13 +36,13 @@ using namespace mlir;
 // ---------------------------------------------------------------------------
 
 static llvm::cl::opt<float> SizeIncreaseThreshold(
-    "ml-advisor-size-increase-threshold", llvm::cl::Hidden,
+    "mlir-ml-advisor-size-increase-threshold", llvm::cl::Hidden,
     llvm::cl::desc("Maximum factor by which expected IR size may increase "
                    "before blocking further inlining."),
     llvm::cl::init(2.0));
 
 static llvm::cl::opt<bool> StopImmediatelyForTest(
-    "ml-inliner-stop-immediately", llvm::cl::Hidden);
+    "mlir-ml-inliner-stop-immediately", llvm::cl::Hidden);
 
 // ---------------------------------------------------------------------------
 // Feature definitions moved to MLInlineModelFeatureMaps.h
@@ -64,167 +65,35 @@ static const std::vector<llvm::TensorSpec> &getMLIRFeatureMap() {
 // Region property helpers (feature extraction)
 // ---------------------------------------------------------------------------
 
-namespace {
 
 /// Gather simple structural statistics for every operation inside a Region.
-struct RegionProperties {
-  int64_t blockCount = 0;
-  int64_t regionCount = 0;
-  int64_t operandCount = 0;
-  int64_t resultCount = 0;
-  int64_t entryBlockArgCount = 0;
-  bool isIsolatedFromAbove = false;
+// RegionProperties is defined in MLInlineAdvisor.h
 
-  static RegionProperties compute(Region *region) {
-    RegionProperties props;
-    if (!region)
-      return props;
 
-    props.blockCount = std::distance(region->begin(), region->end());
-    props.isIsolatedFromAbove =
-        region->getParentOp()
-            ->hasTrait<OpTrait::IsIsolatedFromAbove>();
-
-    // Entry-block argument count.
-    if (!region->empty())
-      props.entryBlockArgCount = region->front().getNumArguments();
-
-    // Walk all nested operations to sum up operands, results, and regions.
-    region->walk([&](Operation *op) {
-      props.operandCount += op->getNumOperands();
-      props.resultCount += op->getNumResults();
-      props.regionCount += op->getNumRegions();
-    });
+RegionProperties RegionProperties::compute(Region *region) {
+  RegionProperties props;
+  if (!region)
     return props;
-  }
-};
 
-} // namespace
+  props.blockCount = std::distance(region->begin(), region->end());
+  props.isIsolatedFromAbove =
+      region->getParentOp()
+          ->hasTrait<OpTrait::IsIsolatedFromAbove>();
 
-// ---------------------------------------------------------------------------
-// MLIRInlineAdvisor
-// ---------------------------------------------------------------------------
+  // Entry-block argument count.
+  if (!region->empty())
+    props.entryBlockArgCount = region->front().getNumArguments();
 
-class MLIRInlineAdvisor;
-
-/// An advice object that records feature values at decision time and updates
-/// internal advisor state after (un)successful inlining.
-class MLIRInlineAdvice {
-public:
-  MLIRInlineAdvice(MLIRInlineAdvisor *advisor, Operation *callOp,
-                   Operation *callerOp, Region *calleeRegion,
-                   bool recommendation,
-                   const std::vector<int64_t> &featureValues);
-  ~MLIRInlineAdvice() = default;
-
-  /// Must be called when inlining succeeded.
-  void recordInlining(bool calleeDeleted);
-
-  /// Must be called when inlining was attempted but failed.
-  void recordUnsuccessfulInlining();
-
-  /// Must be called when inlining was never attempted.
-  void recordUnattemptedInlining();
-
-  bool isInliningRecommended() const { return recommendation; }
-  Operation *getCallOp() const { return callOp; }
-  Operation *getCallerOp() const { return callerOp; }
-  Operation *getCalleeOp() const;
-  Region *getCalleeRegion() const { return calleeRegion; }
-
-private:
-  MLIRInlineAdvisor *advisor;
-  Operation *callOp;
-  Operation *callerOp;
-  Region *calleeRegion;
-  bool recommendation;
-  /// Snapshot of the caller's region properties before inlining.
-  RegionProperties preInlineCallerProps;
-  /// The feature vector that was fed to the model for this decision.
-  std::vector<int64_t> featureValues;
-};
-
-/// The ML-based inlining advisor for MLIR.  This mirrors the LLVM
-/// MLInlineAdvisor architecture but extracts features from MLIR's Region /
-/// Operation / CallGraph infrastructure instead of LLVM IR.
-class MLIRInlineAdvisor {
-public:
-  MLIRInlineAdvisor(
-      Operation *op, CallGraph &cg,
-      std::function<std::unique_ptr<llvm::MLModelRunner>(
-          const std::vector<llvm::TensorSpec> &)>
-          runnerFactory);
-
-  ~MLIRInlineAdvisor() = default;
-
-  /// Evaluate the model for a call site.  Returns an advice object that *must*
-  /// have one of the record* methods called on it.
-  std::unique_ptr<MLIRInlineAdvice> getAdvice(CallOpInterface callOp,
-                                              Operation *callerOp,
-                                              Region *calleeRegion);
-
-  /// Notification that inlining succeeded (called from the advice object).
-  void onSuccessfulInlining(MLIRInlineAdvice &advice, bool calleeDeleted);
-
-  /// Accessors.
-  const std::vector<llvm::TensorSpec> &getFeatureMap() const {
-    return featureMap;
-  }
-  bool isForcedToStop() const { return forceStop; }
-
-  // Public helpers for derived classes / advice.
-  RegionProperties getCachedProps(Region *region);
-
-private:
-  /// Evaluate the model with the current feature buffer.
-  bool evaluateModel();
-
-  /// Recompute module-level call-graph statistics.
-  void recomputeGraphStats();
-
-  /// The ML model runner.
-  std::unique_ptr<llvm::MLModelRunner> runner;
-
-  /// The feature map (descriptors).
-  std::vector<llvm::TensorSpec> featureMap;
-
-  /// A cache of per-region structural properties.
-  llvm::DenseMap<Region *, RegionProperties> propsCache;
-
-  /// Pointers back to the inliner context.
-  Operation *op;
-  CallGraph &cg;
-
-  /// Module-level graph statistics.
-  int64_t graphNodeCount = 0;
-  int64_t graphEdgeCount = 0;
-
-  /// Per-callable call-site height (distance from leaf). Populated at
-  /// construction.
-  llvm::DenseMap<Region *, unsigned> regionLevels;
-
-  /// Whether the advisor has decided to stop recommending inlining (e.g. the
-  /// module grew too much).
-  bool forceStop = false;
-
-  /// Initial (pre-inlining) total operation count across all callables.
-  int64_t initialTotalOps = 0;
-  /// Current total operation count.
-  int64_t currentTotalOps = 0;
-};
-
-// ---------------------------------------------------------------------------
-// RegionProperties cache
-// ---------------------------------------------------------------------------
-
-RegionProperties MLIRInlineAdvisor::getCachedProps(Region *region) {
-  auto it = propsCache.find(region);
-  if (it != propsCache.end())
-    return it->second;
-  RegionProperties props = RegionProperties::compute(region);
-  propsCache[region] = props;
+  // Walk all nested operations to sum up operands, results, and regions.
+  region->walk([&](Operation *op) {
+    props.operandCount += op->getNumOperands();
+    props.resultCount += op->getNumResults();
+    props.regionCount += op->getNumRegions();
+  });
   return props;
 }
+
+
 
 // ---------------------------------------------------------------------------
 // Graph statistics helpers
@@ -251,7 +120,6 @@ static std::pair<int64_t, int64_t> countGraphStats(CallGraph &cg) {
 /// Compute the height of each callable node (longest distance from a leaf).
 static llvm::DenseMap<Region *, unsigned>
 computeRegionLevels(const CallGraph &cg) {
-  // Avoid the sentinel nodes in the SCC walk.
   llvm::DenseMap<Region *, unsigned> levels;
 
   for (auto sccIt = llvm::scc_begin(&cg); !sccIt.isAtEnd(); ++sccIt) {
@@ -304,7 +172,14 @@ static int64_t countTotalOps(CallGraph &cg) {
   return total;
 }
 
+
 // ---------------------------------------------------------------------------
+// MLIRInlineAdvisor
+// ---------------------------------------------------------------------------
+
+// Members below are in the .cpp because they use internal types.
+// (e.g., propsCache uses RegionProperties which is defined in this file.)
+
 // MLIRInlineAdvisor implementation
 // ---------------------------------------------------------------------------
 
@@ -324,7 +199,18 @@ MLIRInlineAdvisor::MLIRInlineAdvisor(
   // Create the model runner.
   runner = runnerFactory(getFeatureMap());
   forceStop = StopImmediatelyForTest;
+
 }
+
+RegionProperties MLIRInlineAdvisor::getCachedProps(Region *region) {
+  auto it = propsCache.find(region);
+  if (it != propsCache.end())
+    return it->second;
+  RegionProperties props = RegionProperties::compute(region);
+  propsCache[region] = props;
+  return props;
+}
+
 
 void MLIRInlineAdvisor::recomputeGraphStats() {
   std::tie(graphNodeCount, graphEdgeCount) = countGraphStats(cg);
@@ -363,6 +249,12 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
   if (forceStop)
     return std::make_unique<MLIRInlineAdvice>(this, callOp, callerOp,
                                               calleeRegion, false,
+                                              std::vector<int64_t>{});
+
+  // If no model runner is available, default to "inline" (no-op advisor).
+  if (!runner)
+    return std::make_unique<MLIRInlineAdvice>(this, callOp, callerOp,
+                                              calleeRegion, true,
                                               std::vector<int64_t>{});
 
   // ----- Extract caller properties -----
@@ -451,6 +343,8 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
 }
 
 bool MLIRInlineAdvisor::evaluateModel() {
+  if (!runner)
+    return true;
   return static_cast<bool>(runner->evaluate<int64_t>());
 }
 

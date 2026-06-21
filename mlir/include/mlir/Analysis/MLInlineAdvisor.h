@@ -19,8 +19,10 @@
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "llvm/Analysis/TensorSpec.h"
 #include "llvm/Analysis/MLModelRunner.h"
+#include "llvm/ADT/DenseMap.h"
 #include <functional>
 #include <memory>
+#include <cstdint>
 #include <vector>
 
 namespace llvm {
@@ -31,8 +33,123 @@ namespace mlir {
 class Operation;
 class Region;
 
-class MLIRInlineAdvice;
 class MLIRInlineAdvisor;
+
+/// Gather simple structural statistics for every operation inside a Region.
+struct RegionProperties {
+  int64_t blockCount = 0;
+  int64_t regionCount = 0;
+  int64_t operandCount = 0;
+  int64_t resultCount = 0;
+  int64_t entryBlockArgCount = 0;
+  bool isIsolatedFromAbove = false;
+
+  static RegionProperties compute(Region *region);
+};
+
+
+/// An advice object that records feature values at decision time and updates
+/// internal advisor state after (un)successful inlining.
+class MLIRInlineAdvice {
+public:
+  MLIRInlineAdvice(MLIRInlineAdvisor *advisor, Operation *callOp,
+                   Operation *callerOp, Region *calleeRegion,
+                   bool recommendation,
+                   const std::vector<int64_t> &featureValues);
+  ~MLIRInlineAdvice() = default;
+
+  /// Must be called when inlining succeeded.
+  void recordInlining(bool calleeDeleted);
+
+  /// Must be called when inlining was attempted but failed.
+  void recordUnsuccessfulInlining();
+
+  /// Must be called when inlining was never attempted.
+  void recordUnattemptedInlining();
+
+  bool isInliningRecommended() const { return recommendation; }
+  Operation *getCallOp() const { return callOp; }
+  Operation *getCallerOp() const { return callerOp; }
+  Operation *getCalleeOp() const;
+  Region *getCalleeRegion() const { return calleeRegion; }
+
+private:
+  MLIRInlineAdvisor *advisor;
+  Operation *callOp;
+  Operation *callerOp;
+  Region *calleeRegion;
+  bool recommendation;
+  /// Snapshot of the caller's region properties before inlining.
+  RegionProperties preInlineCallerProps;
+  std::vector<int64_t> featureValues;
+};
+
+/// The ML-based inlining advisor for MLIR.  This mirrors the LLVM
+/// MLInlineAdvisor architecture but extracts features from MLIR's Region /
+/// Operation / CallGraph infrastructure instead of LLVM IR.
+class MLIRInlineAdvisor {
+public:
+  MLIRInlineAdvisor(
+      Operation *op, CallGraph &cg,
+      std::function<std::unique_ptr<llvm::MLModelRunner>(
+          const std::vector<llvm::TensorSpec> &)>
+          runnerFactory);
+
+  ~MLIRInlineAdvisor() = default;
+
+  /// Evaluate the model for a call site.
+  std::unique_ptr<MLIRInlineAdvice> getAdvice(CallOpInterface callOp,
+                                              Operation *callerOp,
+                                              Region *calleeRegion);
+
+  /// Notification that inlining succeeded (called from the advice object).
+  void onSuccessfulInlining(MLIRInlineAdvice &advice, bool calleeDeleted);
+
+  /// Accessors.
+  const std::vector<llvm::TensorSpec> &getFeatureMap() const {
+    return featureMap;
+  }
+  RegionProperties getCachedProps(Region *region);
+
+  bool isForcedToStop() const { return forceStop; }
+
+private:
+  /// The ML model runner.
+  std::unique_ptr<llvm::MLModelRunner> runner;
+
+  /// The feature map (descriptors).
+  std::vector<llvm::TensorSpec> featureMap;
+
+  /// Pointers back to the inliner context.
+  Operation *op;
+  CallGraph &cg;
+
+  /// Module-level graph statistics.
+  int64_t graphNodeCount = 0;
+  int64_t graphEdgeCount = 0;
+
+  /// Whether the advisor has decided to stop recommending inlining.
+  bool forceStop = false;
+
+  /// Initial total operation count across all callables.
+  int64_t initialTotalOps = 0;
+  /// Current total operation count.
+  int64_t currentTotalOps = 0;
+
+  /// Evaluate the model with the current feature buffer.
+  bool evaluateModel();
+
+  /// Recompute module-level call-graph statistics.
+  void recomputeGraphStats();
+
+  /// Per-callable call-site height (distance from leaf).
+  llvm::DenseMap<Region *, unsigned> regionLevels;
+
+  /// A cache of per-region structural properties.
+  llvm::DenseMap<Region *, RegionProperties> propsCache;
+
+};
+
 
 /// Factory function: creates an MLIRInlineAdvisor that delegates evaluation
 /// to the provided `runnerFactory`.
