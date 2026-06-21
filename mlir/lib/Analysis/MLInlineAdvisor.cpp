@@ -422,7 +422,7 @@ std::unique_ptr<MLIRInlineAdvisor> getReleaseModeMLIRAdvisor(
     std::function<bool(CallOpInterface, Operation *)> getDefaultAdvice) {
   // TODO: wire up the AOT-compiled model (analogous to
   // llvm::getReleaseModeAdvisor).  For now this returns the advisor with a
-  // no-op model runner, which always returns false (no inlining).
+  // no-op model runner (nullptr), so the advisor defaults to always inlining.
   auto runnerFactory =
       [&](const std::vector<llvm::TensorSpec> &inputFeatures)
       -> std::unique_ptr<llvm::MLModelRunner> {

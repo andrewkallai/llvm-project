@@ -45,6 +45,7 @@ add_mlir_library(MLIRAnalysis
   DataFlow/StridedMetadataRangeAnalysis.cpp
 
   MLInlineAdvisor.cpp
+  MLInlineModelFeatureMaps.cpp
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Analysis
 
