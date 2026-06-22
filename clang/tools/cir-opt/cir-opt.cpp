@@ -14,6 +14,7 @@
 
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/Transforms/InlinerInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/OpenMP/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -32,6 +33,8 @@ int main(int argc, char **argv) {
   // TODO: register needed MLIR passes for CIR?
   mlir::DialectRegistry registry;
   cir::registerAllDialects(registry);
+  ::mlir::LLVM::registerInlinerInterface(registry);
+  ::mlir::NVVM::registerInlinerInterface(registry);
   registry.insert<mlir::memref::MemRefDialect, mlir::LLVM::LLVMDialect>();
 
   ::mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
