@@ -14,11 +14,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Transforms/Inliner.h"
+#include "mlir/Analysis/MLInlineAdvisor.h"
 #include "mlir/IR/Threading.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Analysis/MLInlineAdvisor.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
@@ -750,7 +750,8 @@ bool Inliner::Impl::shouldInline(ResolvedCall &resolvedCall) {
   // If an ML advisor is available, also consult it.
   if (mlAdvisor) {
     auto advice = mlAdvisor->getAdvice(
-        resolvedCall.call, resolvedCall.sourceNode->getCallableRegion()->getParentOp(),
+        resolvedCall.call,
+        resolvedCall.sourceNode->getCallableRegion()->getParentOp(),
         resolvedCall.targetNode->getCallableRegion());
     if (!advice->isInliningRecommended())
       return false;

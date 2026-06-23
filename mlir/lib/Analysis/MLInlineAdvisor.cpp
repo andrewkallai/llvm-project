@@ -17,17 +17,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Analysis/CallGraph.h"
+#include "mlir/Analysis/MLInlineModelFeatureMaps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
-#include "mlir/Analysis/MLInlineModelFeatureMaps.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/SCCIterator.h"
+#include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/TensorSpec.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Analysis/MLModelRunner.h"
 
 using namespace mlir;
 
@@ -41,8 +41,9 @@ static llvm::cl::opt<float> SizeIncreaseThreshold(
                    "before blocking further inlining."),
     llvm::cl::init(2.0));
 
-static llvm::cl::opt<bool> StopImmediatelyForTest(
-    "mlir-ml-inliner-stop-immediately", llvm::cl::Hidden);
+static llvm::cl::opt<bool>
+    StopImmediatelyForTest("mlir-ml-inliner-stop-immediately",
+                           llvm::cl::Hidden);
 
 // ---------------------------------------------------------------------------
 // Feature definitions moved to MLInlineModelFeatureMaps.h
@@ -51,8 +52,7 @@ static const std::vector<llvm::TensorSpec> &getMLIRFeatureMap() {
   static std::vector<llvm::TensorSpec> FeatureMap = []() {
     std::vector<llvm::TensorSpec> Map;
 #define POPULATE_NAMES(DTYPE, SHAPE, NAME, DOC)                                \
-  Map.push_back(                                                               \
-      llvm::TensorSpec::createSpec<DTYPE>(#NAME, SHAPE));
+  Map.push_back(llvm::TensorSpec::createSpec<DTYPE>(#NAME, SHAPE));
     ALL_FEATURES(POPULATE_NAMES)
 #undef POPULATE_NAMES
     return Map;
@@ -60,15 +60,12 @@ static const std::vector<llvm::TensorSpec> &getMLIRFeatureMap() {
   return FeatureMap;
 }
 
-
 // ---------------------------------------------------------------------------
 // Region property helpers (feature extraction)
 // ---------------------------------------------------------------------------
 
-
 /// Gather simple structural statistics for every operation inside a Region.
 // RegionProperties is defined in MLInlineAdvisor.h
-
 
 RegionProperties RegionProperties::compute(Region *region) {
   RegionProperties props;
@@ -77,8 +74,7 @@ RegionProperties RegionProperties::compute(Region *region) {
 
   props.blockCount = std::distance(region->begin(), region->end());
   props.isIsolatedFromAbove =
-      region->getParentOp()
-          ->hasTrait<OpTrait::IsIsolatedFromAbove>();
+      region->getParentOp()->hasTrait<OpTrait::IsIsolatedFromAbove>();
 
   // Entry-block argument count.
   if (!region->empty())
@@ -93,8 +89,6 @@ RegionProperties RegionProperties::compute(Region *region) {
   return props;
 }
 
-
-
 // ---------------------------------------------------------------------------
 // Graph statistics helpers
 // ---------------------------------------------------------------------------
@@ -105,8 +99,7 @@ static std::pair<int64_t, int64_t> countGraphStats(CallGraph &cg) {
   int64_t nodes = 0, edges = 0;
   for (CallGraphNode *node : cg) {
     // Skip the two sentinel nodes.
-    if (node == cg.getExternalCallerNode() ||
-        node == cg.getUnknownCalleeNode())
+    if (node == cg.getExternalCallerNode() || node == cg.getUnknownCalleeNode())
       continue;
     ++nodes;
     for (const CallGraphNode::Edge &edge : *node) {
@@ -161,8 +154,7 @@ computeRegionLevels(const CallGraph &cg) {
 static int64_t countTotalOps(CallGraph &cg) {
   int64_t total = 0;
   for (CallGraphNode *node : cg) {
-    if (node == cg.getExternalCallerNode() ||
-        node == cg.getUnknownCalleeNode())
+    if (node == cg.getExternalCallerNode() || node == cg.getUnknownCalleeNode())
       continue;
     Region *r = node->getCallableRegion();
     if (r) {
@@ -171,7 +163,6 @@ static int64_t countTotalOps(CallGraph &cg) {
   }
   return total;
 }
-
 
 // ---------------------------------------------------------------------------
 // MLIRInlineAdvisor
@@ -199,7 +190,6 @@ MLIRInlineAdvisor::MLIRInlineAdvisor(
   // Create the model runner.
   runner = runnerFactory(getFeatureMap());
   forceStop = StopImmediatelyForTest;
-
 }
 
 RegionProperties MLIRInlineAdvisor::getCachedProps(Region *region) {
@@ -210,7 +200,6 @@ RegionProperties MLIRInlineAdvisor::getCachedProps(Region *region) {
   propsCache[region] = props;
   return props;
 }
-
 
 void MLIRInlineAdvisor::recomputeGraphStats() {
   std::tie(graphNodeCount, graphEdgeCount) = countGraphStats(cg);
@@ -247,15 +236,13 @@ std::unique_ptr<MLIRInlineAdvice>
 MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
                              Region *calleeRegion) {
   if (forceStop)
-    return std::make_unique<MLIRInlineAdvice>(this, callOp, callerOp,
-                                              calleeRegion, false,
-                                              std::vector<int64_t>{});
+    return std::make_unique<MLIRInlineAdvice>(
+        this, callOp, callerOp, calleeRegion, false, std::vector<int64_t>{});
 
   // If no model runner is available, default to "inline" (no-op advisor).
   if (!runner)
-    return std::make_unique<MLIRInlineAdvice>(this, callOp, callerOp,
-                                              calleeRegion, true,
-                                              std::vector<int64_t>{});
+    return std::make_unique<MLIRInlineAdvice>(
+        this, callOp, callerOp, calleeRegion, true, std::vector<int64_t>{});
 
   // ----- Extract caller properties -----
   Region *callerRegion = nullptr;
@@ -337,9 +324,9 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
   for (size_t i = 0; i < featureValues.size(); ++i)
     featureValues[i] = *runner->getTensor<int64_t>(i);
 
-  return std::make_unique<MLIRInlineAdvice>(
-      this, callOpAsOp, callerOp, calleeRegion, recommendation,
-      std::move(featureValues));
+  return std::make_unique<MLIRInlineAdvice>(this, callOpAsOp, callerOp,
+                                            calleeRegion, recommendation,
+                                            std::move(featureValues));
 }
 
 bool MLIRInlineAdvisor::evaluateModel() {
@@ -352,9 +339,9 @@ bool MLIRInlineAdvisor::evaluateModel() {
 // MLIRInlineAdvice implementation
 // ---------------------------------------------------------------------------
 
-MLIRInlineAdvice::MLIRInlineAdvice(MLIRInlineAdvisor *advisor, Operation *callOp,
-                                   Operation *callerOp, Region *calleeRegion,
-                                   bool recommendation,
+MLIRInlineAdvice::MLIRInlineAdvice(MLIRInlineAdvisor *advisor,
+                                   Operation *callOp, Operation *callerOp,
+                                   Region *calleeRegion, bool recommendation,
                                    const std::vector<int64_t> &featureValues)
     : advisor(advisor), callOp(callOp), callerOp(callerOp),
       calleeRegion(calleeRegion), recommendation(recommendation),
@@ -400,11 +387,11 @@ namespace mlir {
 /// Create an ML-driven inline advisor for MLIR.  `runnerFactory` receives the
 /// feature descriptors and must return an `MLModelRunner` (or null to indicate
 /// the model is unavailable).
-std::unique_ptr<MLIRInlineAdvisor> createMLIRInlineAdvisor(
-    Operation *op, CallGraph &cg,
-    std::function<std::unique_ptr<llvm::MLModelRunner>(
-        const std::vector<llvm::TensorSpec> &)>
-        runnerFactory) {
+std::unique_ptr<MLIRInlineAdvisor>
+createMLIRInlineAdvisor(Operation *op, CallGraph &cg,
+                        std::function<std::unique_ptr<llvm::MLModelRunner>(
+                            const std::vector<llvm::TensorSpec> &)>
+                            runnerFactory) {
   return std::make_unique<MLIRInlineAdvisor>(op, cg, std::move(runnerFactory));
 }
 
@@ -423,8 +410,7 @@ std::unique_ptr<MLIRInlineAdvisor> getReleaseModeMLIRAdvisor(
   // TODO: wire up the AOT-compiled model (analogous to
   // llvm::getReleaseModeAdvisor).  For now this returns the advisor with a
   // no-op model runner (nullptr), so the advisor defaults to always inlining.
-  auto runnerFactory =
-      [&](const std::vector<llvm::TensorSpec> &inputFeatures)
+  auto runnerFactory = [&](const std::vector<llvm::TensorSpec> &inputFeatures)
       -> std::unique_ptr<llvm::MLModelRunner> {
     // If no AOT model is compiled and no interactive channel is configured,
     // return nullptr to signal "not available".

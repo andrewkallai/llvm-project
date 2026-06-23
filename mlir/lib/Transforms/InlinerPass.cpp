@@ -155,9 +155,8 @@ void InlinerPass::runOnOperation() {
 
   std::unique_ptr<MLIRInlineAdvisor> mlAdvisor;
   if (enableMLInliner) {
-    auto runnerFactory =
-        [&](const std::vector<llvm::TensorSpec> &inputFeatures)
-            -> std::unique_ptr<llvm::MLModelRunner> {
+    auto runnerFactory = [&](const std::vector<llvm::TensorSpec> &inputFeatures)
+        -> std::unique_ptr<llvm::MLModelRunner> {
       if (mlInlinerModelPath.empty()) {
         // No model path given: return nullptr so the advisor falls back
         // to the default heuristic (always inline).
@@ -182,8 +181,7 @@ void InlinerPass::runOnOperation() {
       return nullptr;
 #endif
     };
-    mlAdvisor =
-        createMLIRInlineAdvisor(op, cg, std::move(runnerFactory));
+    mlAdvisor = createMLIRInlineAdvisor(op, cg, std::move(runnerFactory));
   }
   // Get an instance of the inliner.
   Inliner inliner(op, cg, *this, getAnalysisManager(), runPipelineHelper,

@@ -17,12 +17,12 @@
 
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Interfaces/CallInterfaces.h"
-#include "llvm/Analysis/TensorSpec.h"
-#include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Analysis/MLModelRunner.h"
+#include "llvm/Analysis/TensorSpec.h"
+#include <cstdint>
 #include <functional>
 #include <memory>
-#include <cstdint>
 #include <vector>
 
 namespace llvm {
@@ -46,7 +46,6 @@ struct RegionProperties {
 
   static RegionProperties compute(Region *region);
 };
-
 
 /// An advice object that records feature values at decision time and updates
 /// internal advisor state after (un)successful inlining.
@@ -89,18 +88,16 @@ private:
 /// Operation / CallGraph infrastructure instead of LLVM IR.
 class MLIRInlineAdvisor {
 public:
-  MLIRInlineAdvisor(
-      Operation *op, CallGraph &cg,
-      std::function<std::unique_ptr<llvm::MLModelRunner>(
-          const std::vector<llvm::TensorSpec> &)>
-          runnerFactory);
+  MLIRInlineAdvisor(Operation *op, CallGraph &cg,
+                    std::function<std::unique_ptr<llvm::MLModelRunner>(
+                        const std::vector<llvm::TensorSpec> &)>
+                        runnerFactory);
 
   ~MLIRInlineAdvisor() = default;
 
   /// Evaluate the model for a call site.
-  std::unique_ptr<MLIRInlineAdvice> getAdvice(CallOpInterface callOp,
-                                              Operation *callerOp,
-                                              Region *calleeRegion);
+  std::unique_ptr<MLIRInlineAdvice>
+  getAdvice(CallOpInterface callOp, Operation *callerOp, Region *calleeRegion);
 
   /// Notification that inlining succeeded (called from the advice object).
   void onSuccessfulInlining(MLIRInlineAdvice &advice, bool calleeDeleted);
@@ -147,9 +144,7 @@ private:
 
   /// A cache of per-region structural properties.
   llvm::DenseMap<Region *, RegionProperties> propsCache;
-
 };
-
 
 /// Factory function: creates an MLIRInlineAdvisor that delegates evaluation
 /// to the provided `runnerFactory`.
@@ -159,10 +154,10 @@ private:
 /// \param runnerFactory Callback that receives the feature descriptors and
 ///                      returns an MLModelRunner (or nullptr if unavailable).
 std::unique_ptr<MLIRInlineAdvisor>
-createMLIRInlineAdvisor(
-    Operation *op, CallGraph &cg,
-    std::function<std::unique_ptr<llvm::MLModelRunner>(
-        const std::vector<llvm::TensorSpec> &)> runnerFactory);
+createMLIRInlineAdvisor(Operation *op, CallGraph &cg,
+                        std::function<std::unique_ptr<llvm::MLModelRunner>(
+                            const std::vector<llvm::TensorSpec> &)>
+                            runnerFactory);
 
 /// Convenience factory for release mode.  Returns nullptr when no compiled
 /// model is available.
