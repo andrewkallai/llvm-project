@@ -21,6 +21,7 @@
 #include "llvm/ADT/StringMap.h"
 
 namespace mlir {
+class MLIRInlineAdvisor;
 class OpPassManager;
 class Operation;
 
@@ -126,12 +127,12 @@ public:
 
   Inliner(Operation *op, CallGraph &cg, Pass &pass, AnalysisManager am,
           RunPipelineHelperTy runPipelineHelper, const InlinerConfig &config,
-          ProfitabilityCallbackTy isProfitableToInline)
+          ProfitabilityCallbackTy isProfitableToInline,
+          MLIRInlineAdvisor *mlAdvisor = nullptr)
       : op(op), cg(cg), pass(pass), am(am),
         runPipelineHelper(std::move(runPipelineHelper)), config(config),
+        mlAdvisor(mlAdvisor),
         isProfitableToInline(std::move(isProfitableToInline)) {}
-  Inliner(Inliner &) = delete;
-  void operator=(const Inliner &) = delete;
 
   /// Perform inlining on a OpTrait::SymbolTable operation.
   LogicalResult doInlining();
@@ -153,6 +154,8 @@ private:
   /// Returns true, if it is profitable to inline the callable operation
   /// at the call site.
   ProfitabilityCallbackTy isProfitableToInline;
+  /// An optional ML-driven advisor consulted alongside the heuristic.
+  MLIRInlineAdvisor *mlAdvisor{nullptr};
 
   /// Forward declaration of the class providing the actual implementation.
   class Impl;

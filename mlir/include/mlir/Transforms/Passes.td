@@ -333,6 +333,14 @@ def InlinerPass : Pass<"inline"> {
            "in the caller exceeds this value (in percentage), "
            "then the callee is not inlined even if it is legal "
            "to inline it">,
+    Option<"enableMLInliner", "enable-ml-inliner", "bool",
+           /*default=*/"false",
+           "Consult an ML model alongside the heuristic when deciding "
+           "whether to inline">,
+    Option<"mlInlinerModelPath", "ml-inliner-model-path", "std::string",
+           /*default=*/"""",
+           "Path to a compiled ML model for inlining decisions. "
+           "Only meaningful when enable-ml-inliner is set">,
   ];
 }
 

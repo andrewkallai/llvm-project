@@ -44,11 +44,16 @@ add_mlir_library(MLIRAnalysis
   DataFlow/SparseAnalysis.cpp
   DataFlow/StridedMetadataRangeAnalysis.cpp
 
+  MLInlineAdvisor.cpp
+  MLInlineModelFeatureMaps.cpp
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Analysis
 
   DEPENDS
   mlir-headers
+
+  LINK_COMPONENTS
+  Analysis
 
   LINK_LIBS PUBLIC
   MLIRCallInterfaces

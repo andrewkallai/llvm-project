@@ -16,9 +16,18 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "mlir/Analysis/CallGraph.h"
+#include "mlir/Analysis/MLInlineAdvisor.h"
+#include "mlir/Analysis/MLInlineModelFeatureMaps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Inliner.h"
+#include "llvm/Analysis/MLModelRunner.h"
+#include "llvm/Config/llvm-config.h"
+#ifdef LLVM_HAVE_TFLITE
+#include "llvm/Analysis/ModelUnderTrainingRunner.h"
+#include "llvm/IR/LLVMContext.h"
+#endif
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
 #define GEN_PASS_DEF_INLINERPASS
@@ -144,9 +153,39 @@ void InlinerPass::runOnOperation() {
     return isProfitableToInline(call, inliningThreshold);
   };
 
+  std::unique_ptr<MLIRInlineAdvisor> mlAdvisor;
+  if (enableMLInliner) {
+    auto runnerFactory = [&](const std::vector<llvm::TensorSpec> &inputFeatures)
+        -> std::unique_ptr<llvm::MLModelRunner> {
+      if (mlInlinerModelPath.empty()) {
+        // No model path given: return nullptr so the advisor falls back
+        // to the default heuristic (always inline).
+        return nullptr;
+      }
+#if defined(LLVM_HAVE_TFLITE)
+      // Try to load a TFLite model from the provided path.
+      // Use a throwaway LLVMContext for error reporting.
+      auto LLVMCtx = std::make_unique<llvm::LLVMContext>();
+      auto Runner = llvm::ModelUnderTrainingRunner::createAndEnsureValid(
+          *LLVMCtx, mlInlinerModelPath, MLIRDecisionName, inputFeatures);
+      if (Runner)
+        return Runner;
+      op->emitError("MLIR ML inliner: failed to load model from ")
+          << mlInlinerModelPath;
+      return nullptr;
+#else
+      (void)inputFeatures;
+      op->emitError(
+          "MLIR ML inliner: model path specified but LLVM was not built "
+          "with TFLite support. Reconfigure with -DLLVM_HAVE_TFLITE=ON.");
+      return nullptr;
+#endif
+    };
+    mlAdvisor = createMLIRInlineAdvisor(op, cg, std::move(runnerFactory));
+  }
   // Get an instance of the inliner.
   Inliner inliner(op, cg, *this, getAnalysisManager(), runPipelineHelper,
-                  config, profitabilityCb);
+                  config, profitabilityCb, mlAdvisor.get());
 
   // Run the inlining.
   if (failed(inliner.doInlining()))
