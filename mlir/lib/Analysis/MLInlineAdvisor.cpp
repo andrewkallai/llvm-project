@@ -27,6 +27,7 @@
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/TensorSpec.h"
+#include "llvm/Analysis/Utils/TrainingLogger.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace mlir;
@@ -35,20 +36,26 @@ using namespace mlir;
 // Command-line flags
 // ---------------------------------------------------------------------------
 
-static llvm::cl::opt<float> SizeIncreaseThreshold(
-    "mlir-ml-advisor-size-increase-threshold", llvm::cl::Hidden,
-    llvm::cl::desc("Maximum factor by which expected IR size may increase "
-                   "before blocking further inlining."),
-    llvm::cl::init(2.0));
+// Provide accessor functions to avoid global constructors/destructors.
+static float getSizeIncreaseThreshold() {
+  static llvm::cl::opt<float> SizeIncreaseThreshold(
+      "mlir-ml-advisor-size-increase-threshold", llvm::cl::Hidden,
+      llvm::cl::desc("Maximum factor by which expected IR size may increase "
+                     "before blocking further inlining."),
+      llvm::cl::init(2.0));
+  return SizeIncreaseThreshold;
+}
 
-static llvm::cl::opt<bool>
-    StopImmediatelyForTest("mlir-ml-inliner-stop-immediately",
-                           llvm::cl::Hidden);
-
+static bool getStopImmediatelyForTest() {
+  static llvm::cl::opt<bool>
+      StopImmediatelyForTest("mlir-ml-inliner-stop-immediately",
+                             llvm::cl::Hidden);
+  return StopImmediatelyForTest;
+}
 // ---------------------------------------------------------------------------
 // Feature definitions moved to MLInlineModelFeatureMaps.h
 // ------------------------------------------------------------
-static const std::vector<llvm::TensorSpec> &getMLIRFeatureMap() {
+const std::vector<llvm::TensorSpec> &MLIRInlineAdvisor::getMLIRFeatureMap() {
   static std::vector<llvm::TensorSpec> FeatureMap = []() {
     std::vector<llvm::TensorSpec> Map;
 #define POPULATE_NAMES(DTYPE, SHAPE, NAME, DOC)                                \
@@ -178,8 +185,8 @@ MLIRInlineAdvisor::MLIRInlineAdvisor(
     Operation *op, CallGraph &cg,
     std::function<std::unique_ptr<llvm::MLModelRunner>(
         const std::vector<llvm::TensorSpec> &)>
-        runnerFactory)
-    : featureMap(getMLIRFeatureMap()), op(op), cg(cg) {
+        runnerFactory,
+    : featureMap(getMLIRFeatureMap()), cg(cg) {
 
   // Compute call-graph-level features.
   std::tie(graphNodeCount, graphEdgeCount) = countGraphStats(cg);
@@ -189,7 +196,7 @@ MLIRInlineAdvisor::MLIRInlineAdvisor(
 
   // Create the model runner.
   runner = runnerFactory(getFeatureMap());
-  forceStop = StopImmediatelyForTest;
+  forceStop = getStopImmediatelyForTest();
 }
 
 RegionProperties MLIRInlineAdvisor::getCachedProps(Region *region) {
@@ -228,8 +235,14 @@ void MLIRInlineAdvisor::onSuccessfulInlining(MLIRInlineAdvice &advice,
 
   // Stop if the size grew beyond the threshold.
   if (initialTotalOps > 0 &&
-      currentTotalOps > SizeIncreaseThreshold * initialTotalOps)
+      currentTotalOps > getSizeIncreaseThreshold() * initialTotalOps)
     forceStop = true;
+  // Log reward if training logger is configured.
+  if (logger) {
+    int64_t reward = currentTotalOps;
+    logger->logReward(reward);
+    logger->flush();
+  }
 }
 
 std::unique_ptr<MLIRInlineAdvice>
@@ -324,6 +337,14 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
   for (size_t i = 0; i < featureValues.size(); ++i)
     featureValues[i] = *runner->getTensor<int64_t>(i);
 
+  // Log the observation if training logger is configured.
+  if (logger) {
+    logger->startObservation();
+    for (size_t i = 0; i < featureValues.size(); ++i)
+      logger->logTensorValue(
+          i, reinterpret_cast<const char *>(&featureValues[i]));
+    logger->endObservation();
+  }
   return std::make_unique<MLIRInlineAdvice>(this, callOpAsOp, callerOp,
                                             calleeRegion, recommendation,
                                             std::move(featureValues));
@@ -391,8 +412,9 @@ std::unique_ptr<MLIRInlineAdvisor>
 createMLIRInlineAdvisor(Operation *op, CallGraph &cg,
                         std::function<std::unique_ptr<llvm::MLModelRunner>(
                             const std::vector<llvm::TensorSpec> &)>
-                            runnerFactory) {
-  return std::make_unique<MLIRInlineAdvisor>(op, cg, std::move(runnerFactory));
+        runnerFactory,
+  return std::make_unique<MLIRInlineAdvisor>(op, cg, std::move(runnerFactory),
+                                             logger);
 }
 
 } // namespace mlir

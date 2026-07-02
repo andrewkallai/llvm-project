@@ -18,6 +18,8 @@
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Analysis/MLInlineAdvisor.h"
 #include "mlir/Analysis/MLInlineModelFeatureMaps.h"
+#include "llvm/Analysis/Utils/TrainingLogger.h"
+#include "llvm/Support/FileSystem.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Inliner.h"
 #include "llvm/Analysis/MLModelRunner.h"
@@ -154,6 +156,7 @@ void InlinerPass::runOnOperation() {
   };
 
   std::unique_ptr<MLIRInlineAdvisor> mlAdvisor;
+  std::unique_ptr<llvm::Logger> trainingLogger;
   if (enableMLInliner) {
     auto runnerFactory = [&](const std::vector<llvm::TensorSpec> &inputFeatures)
         -> std::unique_ptr<llvm::MLModelRunner> {
@@ -181,7 +184,23 @@ void InlinerPass::runOnOperation() {
       return nullptr;
 #endif
     };
-    mlAdvisor = createMLIRInlineAdvisor(op, cg, std::move(runnerFactory));
+    // Set up training logger if a path was provided.
+    if (!trainingLog.empty()) {
+      std::error_code EC;
+      auto OS = std::make_unique<llvm::raw_fd_ostream>(trainingLog, EC);
+      if (EC) {
+        op->emitError("MLIR ML inliner: cannot open training log ")
+            << trainingLog << ": " << EC.message();
+      } else {
+        trainingLogger = std::make_unique<llvm::Logger>(
+            std::move(OS), MLIRInlineAdvisor::getMLIRFeatureMap(),
+            llvm::TensorSpec::createSpec<int64_t>(MLIRRewardName, {1}),
+            /*IncludeReward=*/true,
+            getMLIRInlineDecisionSpec());
+      }
+    }
+    mlAdvisor = createMLIRInlineAdvisor(op, cg, std::move(runnerFactory),
+                                            trainingLogger.get());
   }
   // Get an instance of the inliner.
   Inliner inliner(op, cg, *this, getAnalysisManager(), runPipelineHelper,

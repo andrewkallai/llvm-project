@@ -131,8 +131,8 @@ public:
           MLIRInlineAdvisor *mlAdvisor = nullptr)
       : op(op), cg(cg), pass(pass), am(am),
         runPipelineHelper(std::move(runPipelineHelper)), config(config),
-        mlAdvisor(mlAdvisor),
-        isProfitableToInline(std::move(isProfitableToInline)) {}
+        isProfitableToInline(std::move(isProfitableToInline)),
+        mlAdvisor(mlAdvisor) {}
 
   /// Perform inlining on a OpTrait::SymbolTable operation.
   LogicalResult doInlining();

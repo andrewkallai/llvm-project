@@ -27,6 +27,7 @@
 
 namespace llvm {
 class MLModelRunner;
+class Logger;
 } // namespace llvm
 
 namespace mlir {
@@ -91,7 +92,8 @@ public:
   MLIRInlineAdvisor(Operation *op, CallGraph &cg,
                     std::function<std::unique_ptr<llvm::MLModelRunner>(
                         const std::vector<llvm::TensorSpec> &)>
-                        runnerFactory);
+                        runnerFactory,
+                    llvm::Logger *logger = nullptr);
 
   ~MLIRInlineAdvisor() = default;
 
@@ -110,15 +112,19 @@ public:
 
   bool isForcedToStop() const { return forceStop; }
 
+  /// Return the MLIR inliner feature map (list of TensorSpecs).
+  static const std::vector<llvm::TensorSpec> &getMLIRFeatureMap();
+
 private:
   /// The ML model runner.
   std::unique_ptr<llvm::MLModelRunner> runner;
 
+  /// Optional training logger.
+  llvm::Logger *logger;
+
   /// The feature map (descriptors).
   std::vector<llvm::TensorSpec> featureMap;
-
-  /// Pointers back to the inliner context.
-  Operation *op;
+  /// The call graph for the module.
   CallGraph &cg;
 
   /// Module-level graph statistics.
@@ -157,7 +163,8 @@ std::unique_ptr<MLIRInlineAdvisor>
 createMLIRInlineAdvisor(Operation *op, CallGraph &cg,
                         std::function<std::unique_ptr<llvm::MLModelRunner>(
                             const std::vector<llvm::TensorSpec> &)>
-                            runnerFactory);
+                            runnerFactory,
+                        llvm::Logger *logger = nullptr);
 
 /// Convenience factory for release mode.  Returns nullptr when no compiled
 /// model is available.

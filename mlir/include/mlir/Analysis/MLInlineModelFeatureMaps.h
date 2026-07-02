@@ -97,7 +97,7 @@ enum class MLIRInlineFeatureIndex : size_t {
 // ---------------------------------------------------------------------------
 
 extern const char *const MLIRDecisionName;
-extern const llvm::TensorSpec MLIRInlineDecisionSpec;
+const llvm::TensorSpec &getMLIRInlineDecisionSpec();
 
 extern const char *const MLIRRewardName;
 

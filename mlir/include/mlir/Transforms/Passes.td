@@ -341,6 +341,10 @@ def InlinerPass : Pass<"inline"> {
            /*default=*/"""",
            "Path to a compiled ML model for inlining decisions. "
            "Only meaningful when enable-ml-inliner is set">,
+    Option<"trainingLog", "training-log", "std::string",
+           /*default=*/"""",
+           "Path to write training log (features + decisions + rewards). "
+           "Only meaningful when enable-ml-inliner is set">,
   ];
 }
 

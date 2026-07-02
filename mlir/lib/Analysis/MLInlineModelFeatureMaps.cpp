@@ -11,6 +11,11 @@
 using namespace mlir;
 
 const char *const mlir::MLIRDecisionName = "inlining_decision";
-const llvm::TensorSpec mlir::MLIRInlineDecisionSpec =
-    llvm::TensorSpec::createSpec<int64_t>(MLIRDecisionName, {1});
 const char *const mlir::MLIRRewardName = "inlining_reward";
+
+// Use a function-local static to avoid global destructor.
+const llvm::TensorSpec &getMLIRInlineDecisionSpec() {
+  static const llvm::TensorSpec Spec =
+      llvm::TensorSpec::createSpec<int64_t>(MLIRDecisionName, {1});
+  return Spec;
+}
