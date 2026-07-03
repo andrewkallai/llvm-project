@@ -186,7 +186,8 @@ MLIRInlineAdvisor::MLIRInlineAdvisor(
     std::function<std::unique_ptr<llvm::MLModelRunner>(
         const std::vector<llvm::TensorSpec> &)>
         runnerFactory,
-    : featureMap(getMLIRFeatureMap()), cg(cg) {
+    llvm::Logger *logger)
+    : featureMap(getMLIRFeatureMap()), logger(logger), cg(cg) {
 
   // Compute call-graph-level features.
   std::tie(graphNodeCount, graphEdgeCount) = countGraphStats(cg);
@@ -413,6 +414,7 @@ createMLIRInlineAdvisor(Operation *op, CallGraph &cg,
                         std::function<std::unique_ptr<llvm::MLModelRunner>(
                             const std::vector<llvm::TensorSpec> &)>
         runnerFactory,
+    llvm::Logger *logger) {
   return std::make_unique<MLIRInlineAdvisor>(op, cg, std::move(runnerFactory),
                                              logger);
 }

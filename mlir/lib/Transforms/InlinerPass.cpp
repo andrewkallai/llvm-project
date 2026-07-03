@@ -196,7 +196,7 @@ void InlinerPass::runOnOperation() {
             std::move(OS), MLIRInlineAdvisor::getMLIRFeatureMap(),
             llvm::TensorSpec::createSpec<int64_t>(MLIRRewardName, {1}),
             /*IncludeReward=*/true,
-            getMLIRInlineDecisionSpec());
+            std::nullopt);
       }
     }
     mlAdvisor = createMLIRInlineAdvisor(op, cg, std::move(runnerFactory),
