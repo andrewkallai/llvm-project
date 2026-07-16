@@ -59,9 +59,13 @@ const std::vector<llvm::TensorSpec> &MLIRInlineAdvisor::getMLIRFeatureMap() {
   static std::vector<llvm::TensorSpec> FeatureMap = []() {
     std::vector<llvm::TensorSpec> Map;
 #define POPULATE_NAMES(DTYPE, SHAPE, NAME, DOC)                                \
-  Map.push_back(llvm::TensorSpec::createSpec<DTYPE>(#NAME, SHAPE));
+  Map.push_back(llvm::TensorSpec::createSpec<DTYPE>("action_" #NAME, SHAPE));
     ALL_FEATURES(POPULATE_NAMES)
 #undef POPULATE_NAMES
+    // RL time step tensors required by TF-Agents TFLite models.
+    Map.push_back(llvm::TensorSpec::createSpec<float>("action_discount", {1}));
+    Map.push_back(llvm::TensorSpec::createSpec<int32_t>("action_step_type", {1}));
+    Map.push_back(llvm::TensorSpec::createSpec<float>("action_reward", {1}));
     return Map;
   }();
   return FeatureMap;
@@ -238,12 +242,6 @@ void MLIRInlineAdvisor::onSuccessfulInlining(MLIRInlineAdvice &advice,
   if (initialTotalOps > 0 &&
       currentTotalOps > getSizeIncreaseThreshold() * initialTotalOps)
     forceStop = true;
-  // Log reward if training logger is configured.
-  if (logger) {
-    int64_t reward = currentTotalOps;
-    logger->logReward(reward);
-    logger->flush();
-  }
 }
 
 std::unique_ptr<MLIRInlineAdvice>
@@ -253,10 +251,95 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
     return std::make_unique<MLIRInlineAdvice>(
         this, callOp, callerOp, calleeRegion, false, std::vector<int64_t>{});
 
-  // If no model runner is available, default to "inline" (no-op advisor).
-  if (!runner)
+  // If no model runner is available, compute features inline and log them
+  // for training data collection (default trace mode), then always inline.
+  if (!runner) {
+    // ----- Extract caller properties -----
+    Region *callerRegion = nullptr;
+    if (auto callable = dyn_cast<CallableOpInterface>(callerOp))
+      callerRegion = callable.getCallableRegion();
+    RegionProperties callerProps = getCachedProps(callerRegion);
+
+    // ----- Extract callee properties -----
+    RegionProperties calleeProps = getCachedProps(calleeRegion);
+
+    // ----- Call-site properties -----
+    Operation *callOpAsOp = callOp.getOperation();
+    int64_t callSiteOperandCount = callOpAsOp->getNumOperands();
+    int64_t callSiteNumCtantArgs = 0;
+    for (Value operand : callOpAsOp->getOperands()) {
+      if (auto *defOp = operand.getDefiningOp()) {
+        if (defOp->getNumOperands() == 0 && defOp->getNumRegions() == 0)
+          ++callSiteNumCtantArgs;
+      }
+    }
+
+    // ----- Call-site height -----
+    unsigned height = 0;
+    auto levelIt = regionLevels.find(calleeRegion);
+    if (levelIt != regionLevels.end())
+      height = levelIt->second;
+
+    // ----- Build feature values without a model runner -----
+    std::vector<int64_t> featureValues(
+        static_cast<size_t>(MLIRInlineFeatureIndex::NumFeatures));
+
+    auto idx = [&](MLIRInlineFeatureIndex e) -> size_t {
+      return static_cast<size_t>(e);
+    };
+
+    featureValues[idx(MLIRInlineFeatureIndex::callee_block_count)] =
+        calleeProps.blockCount;
+    featureValues[idx(MLIRInlineFeatureIndex::callee_region_count)] =
+        calleeProps.regionCount;
+    featureValues[idx(MLIRInlineFeatureIndex::callee_operand_count)] =
+        calleeProps.operandCount;
+    featureValues[idx(MLIRInlineFeatureIndex::callee_result_count)] =
+        calleeProps.resultCount;
+    featureValues[idx(MLIRInlineFeatureIndex::callee_arg_count)] =
+        calleeProps.entryBlockArgCount;
+    featureValues[idx(MLIRInlineFeatureIndex::callee_is_isolated_from_above)] =
+        calleeProps.isIsolatedFromAbove ? 1 : 0;
+    featureValues[idx(MLIRInlineFeatureIndex::caller_block_count)] =
+        callerProps.blockCount;
+    featureValues[idx(MLIRInlineFeatureIndex::caller_region_count)] =
+        callerProps.regionCount;
+    featureValues[idx(MLIRInlineFeatureIndex::caller_operand_count)] =
+        callerProps.operandCount;
+    featureValues[idx(MLIRInlineFeatureIndex::caller_result_count)] =
+        callerProps.resultCount;
+    featureValues[idx(MLIRInlineFeatureIndex::caller_arg_count)] =
+        callerProps.entryBlockArgCount;
+    featureValues[idx(MLIRInlineFeatureIndex::caller_is_isolated_from_above)] =
+        callerProps.isIsolatedFromAbove ? 1 : 0;
+    featureValues[idx(MLIRInlineFeatureIndex::call_site_operand_count)] =
+        callSiteOperandCount;
+    featureValues[idx(MLIRInlineFeatureIndex::call_site_num_ctant_args)] =
+        callSiteNumCtantArgs;
+    featureValues[idx(MLIRInlineFeatureIndex::graph_node_count)] =
+        graphNodeCount;
+    featureValues[idx(MLIRInlineFeatureIndex::graph_edge_count)] =
+        graphEdgeCount;
+    featureValues[idx(MLIRInlineFeatureIndex::callsite_height)] =
+        static_cast<int64_t>(height);
+    featureValues[idx(MLIRInlineFeatureIndex::inlining_decision)] = 1;
+
+    // Log the observation with computed features.
+    if (logger) {
+      logger->startObservation();
+      for (size_t i = 0; i < featureValues.size(); ++i)
+        logger->logTensorValue(
+            i, reinterpret_cast<const char *>(&featureValues[i]));
+      logger->endObservation();
+      // Log default reward so every observation pairs with an outcome.
+      int64_t defaultReward = currentTotalOps;
+      logger->logReward(defaultReward);
+      logger->flush();
+    }
+
     return std::make_unique<MLIRInlineAdvice>(
-        this, callOp, callerOp, calleeRegion, true, std::vector<int64_t>{});
+        this, callOp, callerOp, calleeRegion, true, std::move(featureValues));
+  }
 
   // ----- Extract caller properties -----
   Region *callerRegion = nullptr;
@@ -331,6 +414,8 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
 
   // ----- Evaluate model -----
   bool recommendation = evaluateModel();
+  setFeature(MLIRInlineFeatureIndex::inlining_decision,
+             recommendation ? 1 : 0);
 
   // Build feature value vector for the advice snapshot.
   std::vector<int64_t> featureValues(
@@ -345,6 +430,10 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
       logger->logTensorValue(
           i, reinterpret_cast<const char *>(&featureValues[i]));
     logger->endObservation();
+    // Log default reward so every observation pairs with an outcome.
+    int64_t defaultReward = currentTotalOps;
+    logger->logReward(defaultReward);
+    logger->flush();
   }
   return std::make_unique<MLIRInlineAdvice>(this, callOpAsOp, callerOp,
                                             calleeRegion, recommendation,

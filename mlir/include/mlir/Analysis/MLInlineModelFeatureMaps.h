@@ -22,7 +22,6 @@ namespace mlir {
 // Feature macros
 // ---------------------------------------------------------------------------
 
-// Features derived from the callable's region structure (the "callee" side).
 #define CALLEE_REGION_FEATURES(M)                                              \
   M(int64_t, {1}, callee_block_count,                                          \
     "Number of blocks in the callee region")                                   \
@@ -37,7 +36,6 @@ namespace mlir {
   M(int64_t, {1}, callee_is_isolated_from_above,                               \
     "Whether the callee region is isolated from above")
 
-// Features derived from the caller's region structure.
 #define CALLER_REGION_FEATURES(M)                                              \
   M(int64_t, {1}, caller_block_count,                                          \
     "Number of blocks in the caller region")                                   \
@@ -52,16 +50,14 @@ namespace mlir {
   M(int64_t, {1}, caller_is_isolated_from_above,                               \
     "Whether the caller region is isolated from above")
 
-// Call-site-level features.
 #define CALL_SITE_FEATURES(M)                                                  \
   M(int64_t, {1}, call_site_operand_count,                                     \
     "Number of operands at the call site")                                     \
   M(int64_t, {1}, call_site_num_ctant_args,                                    \
     "Number of constant arguments at the call site")                           \
-  M(int64_t, {1}, callsite_height,                                              \
+  M(int64_t, {1}, callsite_height,                                             \
     "Position of the call site in the call graph (0 = leaf)")
 
-// Module-level graph features.
 #define GRAPH_FEATURES(M)                                                      \
   M(int64_t, {1}, graph_node_count,                                            \
     "Total number of call-graph nodes (externals excluded)")                   \
@@ -74,16 +70,13 @@ namespace mlir {
   M(int64_t, {1}, graph_current_total_ops_ratio,                               \
     "Ratio of current to initial total operation count, scaled by 100")
 
-// All features combined.
 #define ALL_FEATURES(M)                                                        \
   CALLEE_REGION_FEATURES(M)                                                    \
   CALLER_REGION_FEATURES(M)                                                    \
   CALL_SITE_FEATURES(M)                                                        \
-  GRAPH_FEATURES(M)
-
-// ---------------------------------------------------------------------------
-// Feature index enum
-// ---------------------------------------------------------------------------
+  GRAPH_FEATURES(M)                                                            \
+  M(int64_t, {1}, inlining_decision,                                           \
+    "The inlining decision (0 = dont inline, 1 = inline)")
 
 enum class MLIRInlineFeatureIndex : size_t {
 #define POPULATE_INDICES(DTYPE, SHAPE, NAME, DOC) NAME,
@@ -92,13 +85,8 @@ enum class MLIRInlineFeatureIndex : size_t {
       NumFeatures
 };
 
-// ---------------------------------------------------------------------------
-// Decision name and spec, reward name
-// ---------------------------------------------------------------------------
-
 extern const char *const MLIRDecisionName;
 const llvm::TensorSpec &getMLIRInlineDecisionSpec();
-
 extern const char *const MLIRRewardName;
 
 } // namespace mlir
