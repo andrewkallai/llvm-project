@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/CIR/Dialect/IR/CIRDialect.h"
+#include "clang/CIR/Dialect/IR/CIRInlinerInterface.h"
 
 #include "clang/CIR/Dialect/IR/CIRAttrs.h"
 #include "clang/CIR/Dialect/IR/CIROpsEnums.h"
@@ -99,6 +100,7 @@ void cir::CIRDialect::initialize() {
 #define GET_OP_LIST
 #include "clang/CIR/Dialect/IR/CIROps.cpp.inc"
       >();
+  addInterfaces<CIROpAsmDialectInterface, CIRInlinerInterface>();
   addInterfaces<CIROpAsmDialectInterface>();
 }
 

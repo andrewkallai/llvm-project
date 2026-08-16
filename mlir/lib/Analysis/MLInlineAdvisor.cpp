@@ -29,6 +29,7 @@
 #include "llvm/Analysis/TensorSpec.h"
 #include "llvm/Analysis/Utils/TrainingLogger.h"
 #include "llvm/Support/CommandLine.h"
+#include <string_view>
 
 using namespace mlir;
 
@@ -62,14 +63,28 @@ const std::vector<llvm::TensorSpec> &MLIRInlineAdvisor::getMLIRFeatureMap() {
   Map.push_back(llvm::TensorSpec::createSpec<DTYPE>("action_" #NAME, SHAPE));
     ALL_FEATURES(POPULATE_NAMES)
 #undef POPULATE_NAMES
+    return Map;
+  }();
+  return FeatureMap;
+}
+
+// Return feature map with RL extras (discount, step_type, reward) for model loading.
+const std::vector<llvm::TensorSpec> &MLIRInlineAdvisor::getMLIRInputFeatureMap() {
+  static std::vector<llvm::TensorSpec> InputFeatureMap = []() {
+    std::vector<llvm::TensorSpec> Map;
+#define POPULATE_NAMES(DTYPE, SHAPE, NAME, DOC)                                \
+  Map.push_back(llvm::TensorSpec::createSpec<DTYPE>("action_" #NAME, SHAPE));
+    ALL_OBSERVATION_FEATURES(POPULATE_NAMES)
+#undef POPULATE_NAMES
     // RL time step tensors required by TF-Agents TFLite models.
     Map.push_back(llvm::TensorSpec::createSpec<float>("action_discount", {1}));
     Map.push_back(llvm::TensorSpec::createSpec<int32_t>("action_step_type", {1}));
     Map.push_back(llvm::TensorSpec::createSpec<float>("action_reward", {1}));
     return Map;
   }();
-  return FeatureMap;
+  return InputFeatureMap;
 }
+
 
 // ---------------------------------------------------------------------------
 // Region property helpers (feature extraction)
@@ -200,7 +215,7 @@ MLIRInlineAdvisor::MLIRInlineAdvisor(
   currentTotalOps = initialTotalOps;
 
   // Create the model runner.
-  runner = runnerFactory(getFeatureMap());
+  runner = runnerFactory(getMLIRInputFeatureMap());
   forceStop = getStopImmediatelyForTest();
 }
 
@@ -282,7 +297,7 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
 
     // ----- Build feature values without a model runner -----
     std::vector<int64_t> featureValues(
-        static_cast<size_t>(MLIRInlineFeatureIndex::NumFeatures));
+        getFeatureMap().size());
 
     auto idx = [&](MLIRInlineFeatureIndex e) -> size_t {
       return static_cast<size_t>(e);
@@ -322,7 +337,18 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
         graphEdgeCount;
     featureValues[idx(MLIRInlineFeatureIndex::callsite_height)] =
         static_cast<int64_t>(height);
+    featureValues[idx(MLIRInlineFeatureIndex::graph_callee_region_level)] =
+        static_cast<int64_t>(height);
+    featureValues[idx(MLIRInlineFeatureIndex::graph_initial_total_ops)] =
+        initialTotalOps;
+    featureValues[idx(MLIRInlineFeatureIndex::graph_current_total_ops_ratio)] =
+        initialTotalOps > 0 ? (currentTotalOps * 100 / initialTotalOps) : 0;
     featureValues[idx(MLIRInlineFeatureIndex::inlining_decision)] = 1;
+    // Use a simple heuristic to produce varied training data. In CIR, callee
+    // block counts are nearly always <= 2, so the operand count (which varies
+    // widely) is used instead: inline small callees, decline larger ones.
+    bool heuristicInline = calleeProps.operandCount <= 10;
+    featureValues[idx(MLIRInlineFeatureIndex::inlining_decision)] = heuristicInline ? 1 : 0;
 
     // Log the observation with computed features.
     if (logger) {
@@ -331,14 +357,14 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
         logger->logTensorValue(
             i, reinterpret_cast<const char *>(&featureValues[i]));
       logger->endObservation();
-      // Log default reward so every observation pairs with an outcome.
-      int64_t defaultReward = currentTotalOps;
-      logger->logReward(defaultReward);
+      // Log heuristic decision as reward so training log has outcome.
+      int64_t heuristicReward = heuristicInline ? 100 : 0;
+      logger->logReward(heuristicReward);
       logger->flush();
     }
 
     return std::make_unique<MLIRInlineAdvice>(
-        this, callOp, callerOp, calleeRegion, true, std::move(featureValues));
+        this, callOp, callerOp, calleeRegion, heuristicInline, std::move(featureValues));
   }
 
   // ----- Extract caller properties -----
@@ -409,19 +435,38 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
 
   setFeature(MLIRInlineFeatureIndex::graph_node_count, graphNodeCount);
   setFeature(MLIRInlineFeatureIndex::graph_edge_count, graphEdgeCount);
+  setFeature(MLIRInlineFeatureIndex::graph_callee_region_level,
+             static_cast<int64_t>(height));
+  setFeature(MLIRInlineFeatureIndex::graph_initial_total_ops,
+             initialTotalOps);
+  setFeature(MLIRInlineFeatureIndex::graph_current_total_ops_ratio,
+             initialTotalOps > 0 ? (currentTotalOps * 100 / initialTotalOps) : 0);
   setFeature(MLIRInlineFeatureIndex::callsite_height,
              static_cast<int64_t>(height));
 
+  // ----- Set RL time-step extras required by TF-Agents policy models -----
+  // The observation features occupy indices [0, NumObsFeatures). The model also
+  // expects discount / step_type / reward; initialize them to a first,
+  // non-terminal decision step so evaluation is deterministic.
+  const size_t NumObsFeatures =
+      static_cast<size_t>(MLIRInlineFeatureIndex::inlining_decision);
+  *runner->getTensor<float>(NumObsFeatures) = 1.0f;     // action_discount
+  *runner->getTensor<int32_t>(NumObsFeatures + 1) = 0;  // action_step_type (FIRST)
+  *runner->getTensor<float>(NumObsFeatures + 2) = 0.0f; // action_reward
+
   // ----- Evaluate model -----
   bool recommendation = evaluateModel();
-  setFeature(MLIRInlineFeatureIndex::inlining_decision,
-             recommendation ? 1 : 0);
 
   // Build feature value vector for the advice snapshot.
+  // The runner has 20 observation features (indices 0-19) plus RL extras.
+  // inlining_decision (index 20) is the model output, so set it manually.
   std::vector<int64_t> featureValues(
-      static_cast<size_t>(MLIRInlineFeatureIndex::NumFeatures));
-  for (size_t i = 0; i < featureValues.size(); ++i)
+      getFeatureMap().size());
+  size_t obsFeatureCount = static_cast<size_t>(MLIRInlineFeatureIndex::inlining_decision);
+  for (size_t i = 0; i < obsFeatureCount; ++i)
     featureValues[i] = *runner->getTensor<int64_t>(i);
+  featureValues[static_cast<size_t>(MLIRInlineFeatureIndex::inlining_decision)] =
+      recommendation ? 1 : 0;
 
   // Log the observation if training logger is configured.
   if (logger) {
@@ -430,9 +475,9 @@ MLIRInlineAdvisor::getAdvice(CallOpInterface callOp, Operation *callerOp,
       logger->logTensorValue(
           i, reinterpret_cast<const char *>(&featureValues[i]));
     logger->endObservation();
-    // Log default reward so every observation pairs with an outcome.
-    int64_t defaultReward = currentTotalOps;
-    logger->logReward(defaultReward);
+    // Log reward so training log has outcome.
+    int64_t logReward = currentTotalOps;
+    logger->logReward(logReward);
     logger->flush();
   }
   return std::make_unique<MLIRInlineAdvice>(this, callOpAsOp, callerOp,

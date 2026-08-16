@@ -70,6 +70,14 @@ namespace mlir {
   M(int64_t, {1}, graph_current_total_ops_ratio,                               \
     "Ratio of current to initial total operation count, scaled by 100")
 
+// Observation features only (all features except inlining_decision).
+// Used for model input specs, where inlining_decision is the action (output).
+#define ALL_OBSERVATION_FEATURES(M)                                            \
+  CALLEE_REGION_FEATURES(M)                                                    \
+  CALLER_REGION_FEATURES(M)                                                    \
+  CALL_SITE_FEATURES(M)                                                        \
+  GRAPH_FEATURES(M)
+
 #define ALL_FEATURES(M)                                                        \
   CALLEE_REGION_FEATURES(M)                                                    \
   CALLER_REGION_FEATURES(M)                                                    \

@@ -114,6 +114,7 @@ public:
 
   /// Return the MLIR inliner feature map (list of TensorSpecs).
   static const std::vector<llvm::TensorSpec> &getMLIRFeatureMap();
+  static const std::vector<llvm::TensorSpec> &getMLIRInputFeatureMap();
 
 private:
   /// The ML model runner.

@@ -4235,8 +4235,12 @@ class CIR_CallOpBase<string mnemonic, list<Trait> extra_traits = []>
     mlir::OperandRange getArgOperands();
     mlir::MutableOperandRange getArgOperandsMutable();
 
-    /// Return the callee of this operation
+    /// Return the callee of this operation. For indirect calls the callee is
+    /// carried as the first operand (a function pointer value) rather than as
+    /// a `callee` symbol reference.
     mlir::CallInterfaceCallable getCallableForCallee() {
+      if (isIndirect())
+        return getIndirectCall();
       return (*this)->getAttrOfType<mlir::SymbolRefAttr>("callee");
     }
 
