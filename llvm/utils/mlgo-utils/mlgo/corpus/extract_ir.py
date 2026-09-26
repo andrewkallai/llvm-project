@@ -31,7 +31,7 @@ from mlgo.corpus import extract_ir_lib
 from mlgo.corpus import flags
 
 
-def parse_args_and_run():
+def parse_args_and_run(argv=None):
     parser = argparse.ArgumentParser(
         description="A tool for making a corpus from build artifacts"
     )
@@ -62,6 +62,20 @@ def parse_args_and_run():
         type=str,
         help="Path to llvm-objcopy",
         default="llvm-objcopy",
+        nargs="?",
+    )
+    parser.add_argument(
+        "--compiler_path",
+        type=str,
+        help="Path to clang compiler",
+        default="clang",
+        nargs="?",
+    )
+    parser.add_argument(
+        "--build_ext_dir",
+        type=str,
+        help="Path to the build extension directory",
+        default="",
         nargs="?",
     )
     parser.add_argument(
@@ -113,7 +127,7 @@ def parse_args_and_run():
         nargs="?",
     )
     flags.add_verbosity_arguments(parser)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     main(args)
 
 
@@ -163,6 +177,8 @@ def main(args):
         objs,
         args.num_workers,
         args.llvm_objcopy_path,
+        args.compiler_path,
+        args.build_ext_dir,
         args.cmd_filter,
         args.thinlto_build,
         args.cmd_section_name,

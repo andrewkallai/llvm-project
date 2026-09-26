@@ -29,7 +29,6 @@ def should_include_module(cmdline: str, match_regexp: str | None) -> bool:
     lines = cmdline.split("\0")
     return any(len(re.findall(match_regexp, l)) for l in lines)
 
-
 def get_thinlto_index(cmdline: str, basedir: str) -> str | None:
     opts = cmdline.split("\0")
     for option in opts:
@@ -41,7 +40,7 @@ def get_thinlto_index(cmdline: str, basedir: str) -> str | None:
 class TrainingIRExtractor:
     """IR and command line extraction from an object file."""
 
-    def __init__(self, obj_relative_path, output_base_dir, obj_base_dir=None):
+    def __init__(self, obj_relative_path, output_base_dir, obj_base_dir=None, source_file_path=""):
         """Set up a TrainingIRExtractor.
 
         Args:
@@ -54,6 +53,7 @@ class TrainingIRExtractor:
         self._obj_relative_path = obj_relative_path
         self._output_base_dir = output_base_dir
         self._obj_base_dir = obj_base_dir if obj_base_dir is not None else ""
+        self._source_file = source_file_path
 
     def obj_base_dir(self):
         return self._obj_base_dir
@@ -91,8 +91,17 @@ class TrainingIRExtractor:
     def bc_file(self):
         return os.path.join(self.dest_dir(), self.module_name() + ".bc")
 
+    def cir_file(self):
+        return os.path.join(self.dest_dir(), self.module_name() + ".cir")
+
+
     def thinlto_index_file(self):
         return os.path.join(self.dest_dir(), self.module_name() + ".thinlto.bc")
+
+    def _get_extraction_cir_command(self, compiler_path: str, cmdline: str, cir_file_path: str, source_file: str) -> [str]:
+        lines = cmdline.split("\0")
+        return [compiler_path] + lines + ["-fclangir", "-emit-cir", "-o", cir_file_path, os.path.join(self._obj_base_dir, source_file)]
+        # return [compiler_path] + lines + ["-o", cir_file_path, source_file]
 
     def _get_extraction_cmd_command(
         self, llvm_objcopy_path: str, cmd_section_name: str
@@ -124,6 +133,8 @@ class TrainingIRExtractor:
     def _extract_clang_artifacts(
         self,
         llvm_objcopy_path: str,
+        compiler_path: str,
+        build_ext_dir: str,
         cmd_filter: str | None,
         is_thinlto: bool,
         cmd_section_name: str,
@@ -155,14 +166,28 @@ class TrainingIRExtractor:
                 if is_thinlto:
                     index_file = get_thinlto_index(cmdline, self.obj_base_dir())
                     shutil.copy(index_file, self.thinlto_index_file())
-
-            subprocess.check_output(
+            try:
+                subprocess.check_output(
                 self._get_extraction_bc_command(
                     llvm_objcopy_path, bitcode_section_name
                 ),
                 stderr=subprocess.STDOUT,
                 encoding="utf-8",
             )
+            except subprocess.CalledProcessError as e:
+                logging.info("IR compilation failed for %s: %s", llvm_objcopy_path, self.input_obj())
+                return None
+            try:
+                subprocess.check_output(
+                    self._get_extraction_cir_command(
+                    compiler_path, cmdline, self.cir_file(), self._source_file),
+                    stderr=subprocess.STDOUT,
+                    encoding="utf-8",
+                    cwd=f"{build_ext_dir}"
+                ),
+            except subprocess.CalledProcessError as e:
+                logging.info("CIR compilation failed for %s: %s\n"+'*'*70+"\n%s", "clang", e, e.output)
+                return None
         except subprocess.CalledProcessError as e:
             # This may happen if  .o file was build from asm (.S source).
             logging.warning("%s was not processed: %s", self.input_obj(), e)
@@ -170,7 +195,7 @@ class TrainingIRExtractor:
             return None
         assert (
             os.path.exists(self.cmd_file())
-            and os.path.exists(self.bc_file())
+            and (os.path.exists(self.bc_file()) or os.path.exists(self.cir_file()))
             and (not is_thinlto or os.path.exists(self.thinlto_index_file()))
         )
         return self.relative_output_path()
@@ -196,6 +221,8 @@ class TrainingIRExtractor:
     def extract(
         self,
         llvm_objcopy_path: str | None = None,
+        compiler_path: str | None = None,
+        build_ext_dir: str | None = None,
         cmd_filter: str | None = None,
         thinlto_build: str | None = None,
         cmd_section_name: str | None = ".llvmcmd",
@@ -205,6 +232,8 @@ class TrainingIRExtractor:
             return self._extract_lld_artifacts()
         return self._extract_clang_artifacts(
             llvm_objcopy_path=llvm_objcopy_path,
+            compiler_path=compiler_path,
+            build_ext_dir=build_ext_dir,
             cmd_filter=cmd_filter,
             is_thinlto=thinlto_build == "distributed",
             cmd_section_name=cmd_section_name,
@@ -236,6 +265,7 @@ def convert_compile_command_to_objectfile(
         obj_relative_path=obj_rel_path,
         output_base_dir=output_dir,
         obj_base_dir=obj_base_dir,
+        source_file_path=command.get("file", ""),
     )
 
 
@@ -345,6 +375,8 @@ def run_extraction(
     objs: list[TrainingIRExtractor],
     num_workers: int,
     llvm_objcopy_path: str,
+    compiler_path: str,
+    build_ext_dir: str,
     cmd_filter: str | None,
     thinlto_build: str,
     cmd_section_name: str,
@@ -371,6 +403,8 @@ def run_extraction(
     extract_artifacts = functools.partial(
         TrainingIRExtractor.extract,
         llvm_objcopy_path=llvm_objcopy_path,
+        compiler_path=compiler_path,
+        build_ext_dir=build_ext_dir,
         cmd_filter=cmd_filter,
         thinlto_build=thinlto_build,
         cmd_section_name=cmd_section_name,

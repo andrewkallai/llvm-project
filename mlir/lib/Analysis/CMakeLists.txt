@@ -17,6 +17,7 @@ set(LLVM_OPTIONAL_SOURCES
   DataFlow/IntegerRangeAnalysis.cpp
   DataFlow/LivenessAnalysis.cpp
   DataFlow/SparseAnalysis.cpp
+  MLInlineModelFeatureMaps.cpp
   )
 
 add_subdirectory(Presburger)
@@ -42,13 +43,19 @@ add_mlir_library(MLIRAnalysis
   DataFlow/IntegerRangeAnalysis.cpp
   DataFlow/LivenessAnalysis.cpp
   DataFlow/SparseAnalysis.cpp
+  MLInlineModelFeatureMaps.cpp
   DataFlow/StridedMetadataRangeAnalysis.cpp
 
+  MLInlineAdvisor.cpp
+  MLInlineModelFeatureMaps.cpp
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Analysis
 
   DEPENDS
   mlir-headers
+
+  LINK_COMPONENTS
+  Analysis
 
   LINK_LIBS PUBLIC
   MLIRCallInterfaces
