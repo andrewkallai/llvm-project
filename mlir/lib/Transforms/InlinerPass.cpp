@@ -127,6 +127,69 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
   return ratio <= inliningThreshold;
 }
 
+// static bool isModel(const Inliner::ResolvedCall &resolvedCall,
+//                                  unsigned inliningThreshold) {
+//   // Return early, ratio <= 0U will always be false.
+//   if (inliningThreshold == 0U)
+//     return false;
+//   // Return early, ratio <= -1U will always be true.
+//   if (inliningThreshold == -1U)
+//     return true;
+
+//   Region *callerRegion = resolvedCall.sourceNode->getCallableRegion();
+//   Region *calleeRegion = resolvedCall.targetNode->getCallableRegion();
+
+//   assert(calleeRegion && callerRegion && "unexpected external node");
+
+//   auto countOps = [](Region *region) {
+//     unsigned count = 0;
+//     region->walk([&](Operation *) { ++count; });
+//     return count;
+//   };
+
+//   unsigned callerOps = countOps(callerRegion);
+
+//   // Always inline empty callees (if it is possible at all).
+//   if (callerOps == 0)
+//     return true;
+
+//     InlineParams Params;
+
+//     Params = {
+//     }
+//     //M = 
+//     auto &IAA = MAM.getResult<InlineAdvisorAnalysis>(M);
+//     // if (!IAA.tryCreate(Params, Mode,
+//     InlineParams IndirectCallParams = {/* DefaultThreshold*/ 0,
+//                                          /*HintThreshold*/ {},
+//                                          /*OptSizeHintThreshold*/ {},
+//                                          /*ColdThreshold*/ {},
+//                                          /*OptSizeThreshold*/ {},
+//                                          /*OptMinSizeThreshold*/ {},
+//                                          /*HotCallSiteThreshold*/ {},
+//                                          /*LocallyHotCallSiteThreshold*/ {},
+//                                          /*ColdCallSiteThreshold*/ {},
+//                                          /*ComputeFullInlineCost*/ true,
+//                                          /*EnableDeferral*/ true};
+
+//     if (!IAA.tryCreate(IndirectCallParams, InliningAdvisorMode::Development,
+//                       {},
+//                       InlineContext{LTOPhase, InlinePass::MLInliner})) {
+//     // M.getContext().emitError(
+//     //     "Could not setup Inlining Advisor for the requested "
+//     //     "mode and/or options");
+    
+//     false or true
+//   }
+//     /*
+//     HEEEEEE
+//     */
+//   unsigned ratio = countOps(calleeRegion) * 100 / callerOps;
+//   LDBG() << "Callee / caller operation ratio (max: " << inliningThreshold
+//          << "%): " << ratio << "%";
+//   return ratio <= inliningThreshold;
+// }
+
 void InlinerPass::runOnOperation() {
   CallGraph &cg = getAnalysis<CallGraph>();
 
