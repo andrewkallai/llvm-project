@@ -69,17 +69,17 @@ public:
   int64_t getLocalCalls(FunctionOpInterface &F);
   const llvm::MLModelRunner &getModelRunner() const { return *ModelRunner; }
   // FunctionPropertiesInfo &getCachedFPI(Function &) const;
-  llvm::FunctionPropertiesInfo &getCachedFPI(FunctionOpInterface &) const;
+  llvm::FunctionPropertiesInfo &getCachedFPI(FunctionOpInterface) const;
   const std::vector<llvm::TensorSpec> &getFeatureMap() const { return FeatureMap; };
   static const std::vector<llvm::TensorSpec> &getInitialFeatureMap();
 
 protected:
   // std::unique_ptr<InlineAdvice> getAdviceImpl(CallBase &CB) override;
-  // std::unique_ptr<llvm::InlineAdvice> getAdviceImpl(CallOpInterface &CB) override;
+  std::unique_ptr<MLInlineAdvice> getAdviceImpl(CallOpInterface CB);
 
   // std::unique_ptr<InlineAdvice> getMandatoryAdvice(CallBase &CB,
-  // std::unique_ptr<llvm::InlineAdvice> getMandatoryAdvice(CallOpInterface &CB,
-                                                  //  bool Advice) override;
+  std::unique_ptr<MLInlineAdvice> getMandatoryAdvice(CallOpInterface CB,
+                                                   bool Advice);
 
   // virtual std::unique_ptr<MLInlineAdvice> getMandatoryAdviceImpl(CallBase &CB);
   // virtual std::unique_ptr<MLInlineAdvice> getMandatoryAdviceImpl(CallOpInterface &CB);
@@ -87,14 +87,14 @@ protected:
 
   // virtual std::unique_ptr<MLInlineAdvice>
   std::unique_ptr<MLInlineAdvice>
-  getAdviceFromModel(CallOpInterface &CB, llvm::OptimizationRemarkEmitter &ORE);
+  getAdviceFromModel(CallOpInterface CB);
   // getAdviceFromModel(CallBase &CB, OptimizationRemarkEmitter &ORE);
 
   // Get the initial 'level' of the function, or 0 if the function has been
   // introduced afterwards.
   // TODO: should we keep this updated?
   // unsigned getInitialFunctionLevel(const Function &F) const;
-  unsigned getInitialFunctionLevel(const FunctionOpInterface &F) const;
+  unsigned getInitialFunctionLevel(FunctionOpInterface F) const;
 
   std::unique_ptr<llvm::MLModelRunner> ModelRunner;
   // std::function<bool(CallBase &)> GetDefaultAdvice;
@@ -103,9 +103,9 @@ protected:
 
 private:
   int64_t getModuleIRSize() const;
-  std::unique_ptr<llvm::InlineAdvice>
+  std::unique_ptr<MLInlineAdvice>
+  getSkipAdviceIfUnreachableCallsite(CallOpInterface CB);
   // getSkipAdviceIfUnreachableCallsite(CallBase &CB);
-  getSkipAdviceIfUnreachableCallsite(CallOpInterface &CB);
   void print(raw_ostream &OS) const;
   // void print(raw_ostream &OS) const override;
 
@@ -122,15 +122,21 @@ private:
   int64_t EdgesOfLastSeenNodes = 0;
   // const bool UseIR2Vec;
 
-  std::map<const llvm::LazyCallGraph::Node *, unsigned> FunctionLevels;
+  // std::map<const llvm::LazyCallGraph::Node *, unsigned> FunctionLevels;
+  llvm::DenseMap<CallGraphNode *, unsigned> FunctionLevels;
+
   const int32_t InitialIRSize = 0;
   int32_t CurrentIRSize = 0;
   llvm::SmallPtrSet<const llvm::LazyCallGraph::Node *, 1> NodesInLastSCC;
-  DenseSet<const llvm::LazyCallGraph::Node *> AllNodes;
+  // DenseSet<const llvm::LazyCallGraph::Node *> AllNodes;
+  llvm::DenseSet<CallGraphNode *> AllNodes;
   // DenseSet<Function *> DeadFunctions;
-  DenseSet<FunctionOpInterface *> DeadFunctions;
+  // DenseSet<FunctionOpInterface *> DeadFunctions;
+  llvm::DenseSet<Operation *> DeadFunctions;
+
   bool ForceStop = false;
   // ProfileSummaryInfo &PSI;
+  SymbolTableCollection advisorSymbolTable;
 };
 
 /// InlineAdvice that tracks changes post inlining. For that reason, it only
@@ -139,8 +145,9 @@ private:
 class LLVM_ABI MLInlineAdvice {
 public:
   // MLInlineAdvice(MLInlineAdvisor *Advisor, CallBase &CB,
-  MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface &CB,
-                 llvm::OptimizationRemarkEmitter &ORE, bool Recommendation);
+  MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
+                 bool Recommendation);
+                //  llvm::OptimizationRemarkEmitter &ORE, bool Recommendation);
   // ~MLInlineAdvice() override = default;
   ~MLInlineAdvice() = default;
 
@@ -153,11 +160,13 @@ public:
   void recordUnsuccessfulInliningImpl(const llvm::InlineResult &Result);
   void recordUnattemptedInliningImpl();
 
-  MLInlineAdvisor *const Advisor;
-  llvm::Function *const Caller;
-  llvm::Function *const Callee;
-  llvm::Function *getCaller() const { return Caller; }
-  llvm::Function *getCallee() const { return Callee; }
+  // MLInlineAdvisor *const Advisor;
+
+  FunctionOpInterface Caller;
+  FunctionOpInterface Callee;
+
+  FunctionOpInterface getCaller() const { return Caller; }
+  FunctionOpInterface getCallee() const { return Callee; }
 
   const int64_t CallerIRSize;
   const int64_t CalleeIRSize;
@@ -166,10 +175,10 @@ public:
 
 private:
   void reportContextForRemark(DiagnosticInfoOptimizationBase &OR);
-  MLInlineAdvisor *getAdvisor() const {
-    // return static_cast<MLInlineAdvisor *>(Advisor);
-    return Advisor;
-  };
+  // MLInlineAdvisor *getAdvisor() const {
+  //   // return static_cast<MLInlineAdvisor *>(Advisor);
+  //   return Advisor;
+  // };
   // Make a copy of the FPI of the caller right before inlining. If inlining
   // fails, we can just update the cache with that value.
   const llvm::FunctionPropertiesInfo PreInlineCallerFPI;
