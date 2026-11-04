@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/ProfileSummaryInfo.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Instructions.h"

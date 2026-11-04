@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "llvm/Analysis/MLInlineAdvisor.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"

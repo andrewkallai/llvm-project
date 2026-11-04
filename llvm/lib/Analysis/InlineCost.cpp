@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/InlineCost.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"

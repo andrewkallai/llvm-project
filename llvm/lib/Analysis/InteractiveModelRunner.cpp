@@ -9,7 +9,7 @@
 // A runner that communicates with an external agent via 2 file descriptors.
 //===----------------------------------------------------------------------===//
 #include "llvm/Analysis/InteractiveModelRunner.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/TensorSpec.h"
 #include "llvm/Support/ErrorHandling.h"

@@ -9,7 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/StackSafetyAnalysis.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"

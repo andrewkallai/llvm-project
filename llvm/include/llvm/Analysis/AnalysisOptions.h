@@ -62,7 +62,7 @@ enum class SkipMLPolicyCriteria { Never, IfCallerIsNotCold };
 } // namespace llvm
 
 #define OPTIONS_STRUCT_DECL
-#include "AnalysisOptions.inc"
+#include "llvm/Analysis/AnalysisOptions.inc"
 
 namespace llvm {
 

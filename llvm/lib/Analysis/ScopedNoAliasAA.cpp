@@ -47,7 +47,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/ScopedNoAliasAA.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/MemoryLocation.h"

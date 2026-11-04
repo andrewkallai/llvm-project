@@ -9,7 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/RegionPrinter.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/Analysis/DOTGraphTraitsPass.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Analysis/RegionIterator.h"

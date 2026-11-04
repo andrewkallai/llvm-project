@@ -26,7 +26,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/LoopCacheAnalysis.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/SmallVector.h"

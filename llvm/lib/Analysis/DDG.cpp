@@ -9,7 +9,7 @@
 // The implementation for the data dependence graph.
 //===----------------------------------------------------------------------===//
 #include "llvm/Analysis/DDG.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopIterator.h"

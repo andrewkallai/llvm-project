@@ -100,7 +100,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/TypeBasedAliasAnalysis.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/MemoryLocation.h"

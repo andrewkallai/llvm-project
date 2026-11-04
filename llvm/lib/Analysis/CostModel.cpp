@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/CostModel.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IntrinsicInst.h"

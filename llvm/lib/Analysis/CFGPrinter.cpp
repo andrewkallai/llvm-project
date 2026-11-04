@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/CFGPrinter.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/IR/ModuleSlotTracker.h"
 #include "llvm/Support/FileSystem.h"

@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/InstructionPrecedenceTracking.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/PatternMatch.h"
 

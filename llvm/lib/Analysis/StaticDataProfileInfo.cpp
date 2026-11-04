@@ -1,5 +1,5 @@
 #include "llvm/Analysis/StaticDataProfileInfo.h"
-#include "AnalysisOptions.h"
+#include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
