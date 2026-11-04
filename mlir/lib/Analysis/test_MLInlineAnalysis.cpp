@@ -1,4 +1,4 @@
-//===- MLInlineAdvisor.cpp - machine learned InlineAdvisor ----------------===//
+//===- test_MLInlineAnalysis.cpp - machine learned InlineAdvisor ----------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -33,7 +33,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
-#include "mlir/Transforms/test_MLInlineAdvisor.h"
+#include "mlir/Analysis/test_MLInlineAnalysis.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"

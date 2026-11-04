@@ -36,6 +36,7 @@ add_mlir_library(MLIRAnalysisBase
   SliceAnalysis.cpp
   SliceWalk.cpp
   TopologicalSortUtils.cpp
+  test_MLInlineAnalysis.cpp
 
   OBJECT
   PARTIAL_SOURCES_INTENDED
