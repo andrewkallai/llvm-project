@@ -205,7 +205,8 @@ MLInlineAdvisor::MLInlineAdvisor(
         std::unique_ptr<llvm::MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
         GetModelRunner,
     std::function<bool(CallOpInterface &)> GetDefaultAdvice)
-    : Opts(llvm::getAnalysisOptions(moduleOp)), GetDefaultAdvice(GetDefaultAdvice),
+    // : Opts(llvm::getAnalysisOptions(moduleOp)), GetDefaultAdvice(GetDefaultAdvice),
+    : GetDefaultAdvice(GetDefaultAdvice),
       FeatureMap(getInitialFeatureMap()),
       CG(AM.getAnalysis<CallGraph>()),
       InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize),
@@ -311,7 +312,7 @@ MLInlineAdvisor::MLInlineAdvisor(
     return;
   }
   ModelRunner->switchContext("");
-  ForceStop = Opts.ml_inliner_stop_immediately;
+  // ForceStop = Opts.ml_inliner_stop_immediately;
 }
 
 /*HERE*/
@@ -489,7 +490,7 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface C
   // FunctionOpInterface Callee = dyn_cast_or_null<FunctionOpInterface>(calleeOp);
   FunctionOpInterface Callee = cast<FunctionOpInterface>(calleeOp);
 
-  if (Opts.ml_inliner_skip_policy == SkipMLPolicyCriteria::IfCallerIsNotCold) {
+  // if (Opts.ml_inliner_skip_policy == SkipMLPolicyCriteria::IfCallerIsNotCold) {
     // if (!PSI.isFunctionEntryCold(&Caller)) {
     //   // Return a MLInlineAdvice, despite delegating to the default advice,
     //   // because we need to keep track of the internal state. This is different
@@ -501,7 +502,7 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface C
     //                    : std::make_unique<MLInlineAdvice>(this, CB, ORE,
     //                                                       GetDefaultAdvice(CB));
     // }
-  }
+  // }
   // auto MandatoryKind = InlineAdvisor::getMandatoryKind(CB, FAM, ORE);
   // If this is a "never inline" case, there won't be any changes to internal
   // state we need to track, so we can just return the base InlineAdvice, which
@@ -613,8 +614,8 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface C
   //       static_cast<llvm::InlineCostFeatureIndex>(I))) = CostFeatures->at(I);
   // }
   // This one would have been set up to be right at the end.
-  if (!Opts.inliner_interactive_channel_base.empty() &&
-      Opts.inliner_interactive_include_default)
+  // if (!Opts.inliner_interactive_channel_base.empty() &&
+      // Opts.inliner_interactive_include_default)
     *ModelRunner->getTensor<int64_t>(getFeatureMap().size() - 1) =
         GetDefaultAdvice(CB);
   return getAdviceFromModel(CB);

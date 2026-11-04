@@ -15,7 +15,7 @@
 #include "llvm/Option/LibraryOptions.h"
 
 #define OPTIONS_STRUCT_DEFS
-#include "AnalysisOptions.inc"
+#include "llvm/Analysis/AnalysisOptions.inc"
 
 using namespace llvm;
 

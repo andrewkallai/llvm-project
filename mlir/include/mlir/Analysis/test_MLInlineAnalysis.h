@@ -31,6 +31,7 @@
 
 // namespace llvm {
 namespace mlir {
+struct AnalysisOptions;
 class DiagnosticInfoOptimizationBase;
 // class Module;
 class MLInlineAdvice;
@@ -107,6 +108,7 @@ protected:
   // unsigned getInitialFunctionLevel(const Function &F) const;
   unsigned getInitialFunctionLevel(FunctionOpInterface F) const;
 
+  // const AnalysisOptions &Opts;
   std::unique_ptr<llvm::MLModelRunner> ModelRunner;
   // std::function<bool(CallBase &)> GetDefaultAdvice;
   std::function<bool(CallOpInterface &)> GetDefaultAdvice;
