@@ -157,8 +157,8 @@ static std::vector<llvm::TensorSpec> FeatureMap{
   return FeatureMap;
 }
 
-struct MyOperationAnalysis {
-  MyOperationAnalysis(Operation *op);
+// struct MyOperationAnalysis {
+  // MyOperationAnalysis(Operation *op);
 
 // const char *const llvm::DecisionName = "inlining_decision";
 // const llvm::TensorSpec llvm::InlineDecisionSpec =
@@ -168,7 +168,7 @@ struct MyOperationAnalysis {
 //     llvm::TensorSpec::createSpec<int64_t>(DefaultDecisionName, {1});
 // const char *const llvm::RewardName = "delta_size";
 
-static CallOpInterface getInlinableCS(CallOpInterface callOp, 
+CallOpInterface getInlinableCS(CallOpInterface callOp, 
                                       SymbolTableCollection &symbolTable) {
   // 1. Resolve the callee. 
   // resolveCallable returns generic Operation*, so we can't avoid that implicit upcast,
@@ -191,7 +191,7 @@ static CallOpInterface getInlinableCS(CallOpInterface callOp,
 }
 
 
-};
+// };
 
 MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
     : moduleOp(cast<ModuleOp>(op)) {
@@ -242,7 +242,7 @@ MLInlineAdvisor::MLInlineAdvisor(
 
         // if (auto *CS = getInlinableCS(I)) {
         // if (auto CS = MyOperationAnalysis::getInlinableCS(*op)) {
-        if (MyOperationAnalysis::getInlinableCS(callOp, advisorSymbolTable)) {
+        if (getInlinableCS(callOp, advisorSymbolTable)) {
 
           // auto *Called = CS->getCalledFunction();
           // auto Called = CS.getCallableForCallee();
