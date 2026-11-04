@@ -37,6 +37,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Analysis/SymbolTableAnalysis.h"
 
 
 
@@ -120,10 +121,9 @@ enum class EmitCModelChoice {
 //   llvm_unreachable("Unknown MLGO model type!");
 // }
 
-// std::unique_ptr<llvm::InlineAdvisor>
 /*HERE*/
-// llvm::getReleaseModeAdvisor(Module &M, ModuleAnalysisManager &MAM,
-// llvm::getReleaseModeAdvisor(ModuleOp &M, ModuleAnalysisManager &MAM,
+// std::unique_ptr<MLInlineAdvisor>
+// MLInlineAdvisor::getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
 //                             std::function<bool(CallOpInterface &)> GetDefaultAdvice) {
 //   if (!isReleaseModelValid<CompiledModelType>(InteractiveChannelBaseName,
 //                                               SelectedMLGOModel))
@@ -135,7 +135,7 @@ enum class EmitCModelChoice {
 //         InlineDecisionSpec, createEmitCModelRunner,
 //         EmbeddedModelRunnerOptions().setModelSelector(ModelSelector));
 //   };
-//   return std::make_unique<MLInlineAdvisor>(M, MAM, RunnerFactory,
+//   return std::make_unique<MLInlineAdvisor>(M, AM, RunnerFactory,
 //                                            GetDefaultAdvice);
 // }
 
@@ -204,24 +204,23 @@ static CallOpInterface getInlinableCS(CallOpInterface callOp,
 
 };
 
+MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
+    : moduleOp(cast<ModuleOp>(op)) {
+  // Initialize the MLInlineAdvisor with the provided operation and analysis manager.
+  // MLInlineAdvisor(moduleOp, am);
+}
+
 MLInlineAdvisor::MLInlineAdvisor(
-/*HERE*/
-    // Module &M, ModuleAnalysisManager &MAM,
-    ModuleOp &M, ModuleAnalysisManager &MAM,
+    ModuleOp &moduleOp, AnalysisManager &AM,
     std::function<
         std::unique_ptr<llvm::MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
         GetModelRunner,
-    // std::function<bool(CallBase &)> GetDefaultAdvice)
     std::function<bool(CallOpInterface &)> GetDefaultAdvice)
-    : //InlineAdvisor(
-          // M, MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager()),
-      GetDefaultAdvice(GetDefaultAdvice), FeatureMap(getInitialFeatureMap()),
-      // CG(MAM.getResult<LazyCallGraphAnalysis>(M)),
-      // CG(MAM.getAnalysis<CallGraph>()),
-      CG(AnalysisManager(MAM).getAnalysis<CallGraph>()),
-      // UseIR2Vec(MAM.getCachedResult<IR2VecVocabAnalysis>(M) != nullptr),
-      InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize){
-      // PSI(MAM.getResult<ProfileSummaryAnalysis>(M)) {
+    : GetDefaultAdvice(GetDefaultAdvice), FeatureMap(getInitialFeatureMap()),
+      CG(AM.getAnalysis<CallGraph>()),
+      InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize),
+      advisorSymbolTable(AM.getAnalysis<SymbolTableAnalysis>().getSymbolTables()) {
+
   // Extract the 'call site height' feature - the position of a call site
   // relative to the farthest statically reachable SCC node. We don't mutate
   // this value while inlining happens. Empirically, this feature proved
@@ -230,8 +229,8 @@ MLInlineAdvisor::MLInlineAdvisor(
   // improvement.
   // CallGraph CGraph(M);
   // for (auto I = scc_begin(&CGraph); !I.isAtEnd(); ++I) {
-  SymbolTableCollection advisorSymbolTable;
-  const CallGraph CGraph(M.getOperation());
+  // SymbolTableCollection advisorSymbolTable;
+  const CallGraph CGraph(moduleOp.getOperation());
   // const CallGraph *cgPtr = &CGraph;
   for (auto I = llvm::scc_begin(&CGraph); !I.isAtEnd(); ++I) {
     const std::vector<CallGraphNode *> &CGNodes = *I;
@@ -318,7 +317,7 @@ MLInlineAdvisor::MLInlineAdvisor(
   ModelRunner = GetModelRunner(getFeatureMap());
   if (!ModelRunner) {
     // M.getContext().emitError("Could not create model runner");
-    M.emitError("Could not create model runner");
+    moduleOp.emitError("Could not create model runner");
     return;
   }
   ModelRunner->switchContext("");

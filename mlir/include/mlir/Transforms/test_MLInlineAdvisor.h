@@ -36,18 +36,24 @@ class DiagnosticInfoOptimizationBase;
 class MLInlineAdvice;
 class ProfileSummaryInfo;
 
-// class LLVM_ABI MLInlineAdvisor : public llvm::InlineAdvisor {
-class LLVM_ABI MLInlineAdvisor {
+class MLInlineAnalysis {
+public:
+  MLInlineAnalysis(Operation *op, AnalysisManager &am);
+
+  ~MLInlineAnalysis() = default;
+
+private:
+  ModuleOp moduleOp;
+};
+
+class MLInlineAdvisor {
 public:
 /*HERE*/
-  // MLInlineAdvisor(Module &M, ModuleAnalysisManager &MAM,
-  MLInlineAdvisor(ModuleOp &M, ModuleAnalysisManager &MAM,
+  MLInlineAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
                   std::function<std::unique_ptr<llvm::MLModelRunner>(
                       const std::vector<llvm::TensorSpec> &)>
                       GetModelRunner,
                   std::function<bool(CallOpInterface &)> GetDefaultAdvice);
-                  // std::function<bool(CallOpInterface &)> GetDefaultAdvice);
-                  // std::function<bool(CallBase &)> GetDefaultAdvice);
 
   ~MLInlineAdvisor() = default;
   // ~MLInlineAdvisor() override = default;
@@ -72,6 +78,11 @@ public:
   llvm::FunctionPropertiesInfo &getCachedFPI(FunctionOpInterface) const;
   const std::vector<llvm::TensorSpec> &getFeatureMap() const { return FeatureMap; };
   static const std::vector<llvm::TensorSpec> &getInitialFeatureMap();
+  
+  std::unique_ptr<MLInlineAdvisor>
+  getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
+                      std::function<bool(CallOpInterface &)> GetDefaultAdvice);
+
 
 protected:
   // std::unique_ptr<InlineAdvice> getAdviceImpl(CallBase &CB) override;
@@ -136,13 +147,13 @@ private:
 
   bool ForceStop = false;
   // ProfileSummaryInfo &PSI;
-  SymbolTableCollection advisorSymbolTable;
+  SymbolTableCollection &advisorSymbolTable;
 };
 
 /// InlineAdvice that tracks changes post inlining. For that reason, it only
 /// overrides the "successful inlining" extension points.
 // class LLVM_ABI MLInlineAdvice : public llvm::InlineAdvice {
-class LLVM_ABI MLInlineAdvice {
+class MLInlineAdvice {
 public:
   // MLInlineAdvice(MLInlineAdvisor *Advisor, CallBase &CB,
   MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
