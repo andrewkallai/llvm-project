@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 // #include "llvm/Analysis/MLInlineAdvisor.h"
-#include "llvm/Analysis/AnalysisOptions.h"
+// #include "llvm/Analysis/AnalysisOptions.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"
@@ -35,6 +35,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/test_MLInlineAnalysis.h"
+#include "mlir/Analysis/AnalysisOptions.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"
@@ -47,36 +48,6 @@
 
 
 using namespace mlir;
-
-
-
-// static llvm::cl::opt<std::string> InteractiveChannelBaseName(
-//     "inliner-interactive-channel-base", llvm::cl::Hidden,
-//     llvm::cl::desc(
-//         "Base file path for the interactive mode. The incoming filename should "
-//         "have the name <inliner-interactive-channel-base>.in, while the "
-//         "outgoing name should be <inliner-interactive-channel-base>.out"));
-// static const std::string InclDefaultMsg =
-//     (llvm::Twine("In interactive mode, also send the default policy decision: ") +
-//      llvm::DefaultDecisionName + ".")
-//         .str();
-// static llvm::cl::opt<bool>
-//     InteractiveIncludeDefault("inliner-interactive-include-default", llvm::cl::Hidden,
-//                               llvm::cl::desc(InclDefaultMsg));
-
-enum class SkipMLPolicyCriteria { Never, IfCallerIsNotCold };
-
-// static llvm::cl::opt<SkipMLPolicyCriteria> SkipPolicy(
-//     "ml-inliner-skip-policy", llvm::cl::Hidden, llvm::cl::init(SkipMLPolicyCriteria::Never),
-//     llvm::cl::values(clEnumValN(SkipMLPolicyCriteria::Never, "never", "never"),
-//                clEnumValN(SkipMLPolicyCriteria::IfCallerIsNotCold,
-//                           "if-caller-not-cold", "if the caller is not cold")));
-
-// static llvm::cl::opt<std::string> ModelSelector("ml-inliner-model-selector",
-//                                           llvm::cl::Hidden, llvm::cl::init(""));
-
-// static llvm::cl::opt<bool> StopImmediatelyForTest("ml-inliner-stop-immediately",
-//                                             llvm::cl::Hidden);
 
 #if defined(LLVM_HAVE_TF_AOT_INLINERSIZEMODEL)
 // codegen-ed file
@@ -108,7 +79,7 @@ enum class EmitCModelChoice {
 
 // static std::unique_ptr<llvm::MLModelRunner>
 // createEmitCModelRunner(LLVMContext &Ctx,
-//                        const std::vector<TensorSpec> &InputFeatures) {
+//                        const std::vector<llvm::TensorSpec> &InputFeatures) {
 //   switch (SelectedMLGOModel) {
 //   case EmitCModelChoice::Default:
 //     return nullptr;
@@ -121,22 +92,22 @@ enum class EmitCModelChoice {
 // }
 
 // std::unique_ptr<MLInlineAdvisor>
-// llvm::getReleaseModeAdvisor(Module &M, ModuleAnalysisManager &MAM,
+// llvm::getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
 //                             std::function<bool(CallBase &)> GetDefaultAdvice) {
-//   const AnalysisOptions &Opts = getAnalysisOptions(M);
+//   const AnalysisOptions &Opts = getAnalysisOptions(moduleOp);
 //   if (!isReleaseModelValid<CompiledModelType>(
 //           Opts.inliner_interactive_channel_base, SelectedMLGOModel))
 //     return nullptr;
 //   auto RunnerFactory = [&](const std::vector<TensorSpec> &InputFeatures)
 //       -> std::unique_ptr<MLModelRunner> {
 //     return createReleaseModeModelRunner<CompiledModelType>(
-//         M.getContext(), InputFeatures, DecisionName,
+//         moduleOp.getContext(), InputFeatures, DecisionName,
 //         Opts.inliner_interactive_channel_base.str(), InlineDecisionSpec,
 //         createEmitCModelRunner,
 //         EmbeddedModelRunnerOptions().setModelSelector(
 //             Opts.ml_inliner_model_selector));
 //   };
-//   return std::make_unique<MLInlineAdvisor>(M, MAM, RunnerFactory,
+//   return std::make_unique<MLInlineAdvisor>(moduleOp, AM, RunnerFactory,
 //                                            GetDefaultAdvice);
 // }
 
@@ -160,13 +131,19 @@ static std::vector<llvm::TensorSpec> FeatureMap{
 // struct MyOperationAnalysis {
   // MyOperationAnalysis(Operation *op);
 
-// const char *const llvm::DecisionName = "inlining_decision";
-// const llvm::TensorSpec llvm::InlineDecisionSpec =
-//     llvm::TensorSpec::createSpec<int64_t>(DecisionName, {1});
-// const char *const llvm::DefaultDecisionName = "inlining_default";
-// const llvm::TensorSpec llvm::DefaultDecisionSpec =
-//     llvm::TensorSpec::createSpec<int64_t>(DefaultDecisionName, {1});
-// const char *const llvm::RewardName = "delta_size";
+const char *const llvm::DecisionName = "inlining_decision";
+const llvm::TensorSpec &getInlineDecisionSpec() {
+  static const llvm::TensorSpec decisionNameSpec =
+      llvm::TensorSpec::createSpec<int64_t>(llvm::DecisionName, {1});
+  return decisionNameSpec;
+}
+const char *const llvm::DefaultDecisionName = "inlining_default";
+const llvm::TensorSpec &getDefaultDecisionSpec() {
+  static const llvm::TensorSpec defaultDecisionNameSpec =
+      llvm::TensorSpec::createSpec<int64_t>(llvm::DefaultDecisionName, {1});
+  return defaultDecisionNameSpec;
+}
+const char *const llvm::RewardName = "delta_size";
 
 CallOpInterface getInlinableCS(CallOpInterface callOp, 
                                       SymbolTableCollection &symbolTable) {
@@ -486,7 +463,7 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface C
 
 
   FunctionOpInterface Caller = CB->getParentOfType<FunctionOpInterface>();
-  Operation *calleeOp = mlir::call_interface_impl::resolveCallable(CB, &advisorSymbolTable);
+  Operation *calleeOp = call_interface_impl::resolveCallable(CB, &advisorSymbolTable);
   // FunctionOpInterface Callee = dyn_cast_or_null<FunctionOpInterface>(calleeOp);
   FunctionOpInterface Callee = cast<FunctionOpInterface>(calleeOp);
 

@@ -29,6 +29,7 @@ add_subdirectory(Presburger)
 add_mlir_library(MLIRAnalysisBase
   AliasAnalysis.cpp
   AliasAnalysis/LocalAliasAnalysis.cpp
+  AnalysisOptions.cpp
   CallGraph.cpp
   CFGLoopInfo.cpp
   DataLayoutAnalysis.cpp
@@ -43,6 +44,9 @@ add_mlir_library(MLIRAnalysisBase
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Analysis
+
+  DEPENDS
+  MLIRAnalysisOptions
 
   LINK_LIBS PUBLIC
   MLIRCallInterfaces

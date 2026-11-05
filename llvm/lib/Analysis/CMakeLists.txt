@@ -1,7 +1,4 @@
 set(LLVM_TABLEGEN_PROJECT LLVM_HEADERS)
-#set(LLVM_TARGET_DEFINITIONS AnalysisOptions.td)
-#llvm_tablegen(AnalysisOptions.inc -gen-opt-parser-defs)
-#add_public_tablegen_target(AnalysisOptionsTableGen)
 
 include(MLGOLower)
 mlgo_lower_models(
@@ -186,7 +183,6 @@ add_llvm_component_library(LLVMAnalysis
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Analysis
 
   DEPENDS
-#  AnalysisOptionsTableGen
   analysis_gen
   intrinsics_gen
   ${MLDeps}
