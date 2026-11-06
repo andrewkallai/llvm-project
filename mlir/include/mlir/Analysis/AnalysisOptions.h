@@ -13,7 +13,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include <optional>
 
-namespace llvm {
+namespace mlir {
 
 // Forward-declared so that Analysis headers can include this one. Fields of
 // these types default to the zero enumerator.
@@ -64,22 +64,35 @@ enum class SkipMLPolicyCriteria { Never, IfCallerIsNotCold };
 #define OPTIONS_STRUCT_DECL
 #include "mlir/Analysis/AnalysisOptions.inc"
 
-namespace llvm {
+// namespace llvm {
 
-class Loop;
-class Module;
+// class Loop;
+// class Module;
 
-inline const AnalysisOptions &getAnalysisOptions(const LLVMContext &C) {
-  return C.getLibraryOptions().get<AnalysisOptions>();
-}
+// inline const AnalysisOptions &getAnalysisOptions(const LLVMContext &C) {
+//   return C.getLibraryOptions().get<AnalysisOptions>();
+// }
 
-inline const AnalysisOptions &getAnalysisOptions(const Function &F) {
-  return getAnalysisOptions(F.getContext());
-}
+// inline const AnalysisOptions &getAnalysisOptions(const Function &F) {
+//   return getAnalysisOptions(F.getContext());
+// }
 
-const AnalysisOptions &getAnalysisOptions(const Module &M);
-const AnalysisOptions &getAnalysisOptions(const Loop &L);
+// const AnalysisOptions &getAnalysisOptions(const Module &M);
+// const AnalysisOptions &getAnalysisOptions(const Loop &L);
 
-} // namespace llvm
+// } // namespace llvm
 
+namespace mlir {
+
+/// Register command-line options used by MLIR analyses.
+void registerAnalysisCLOptions();
+
+const AnalysisOptions &getAnalysisOptions();
+
+const AnalysisOptions &getAnalysisOptions(Operation &op);
+
+} // namespace mlir
 #endif // LLVM_LIB_ANALYSIS_ANALYSISOPTIONS_H
+
+
+

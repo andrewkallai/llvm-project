@@ -8,7 +8,7 @@
 
 include "llvm/Option/LibraryOptions.td"
 
-def AnalysisOptions : OptionsStruct;
+def AnalysisOptions : OptionsStruct<"mlir">;
 
 // // AliasAnalysis.cpp
 // // Print a trace of alias analysis queries and their results.
@@ -345,6 +345,13 @@ defm : ValueField<"ml-advisor-size-increase-threshold", "float", "2.0f",
 defm : ValueField<"ml-inliner-model-selector", "StringRef", "", "">;
 defm : EnumField<"ml-inliner-skip-policy", "SkipMLPolicyCriteria", "SkipMLPolicyCriteria::Never", "never,if-caller-not-cold", ["SkipMLPolicyCriteria::Never", "SkipMLPolicyCriteria::IfCallerIsNotCold"], "">;
 defm : BoolField<"ml-inliner-stop-immediately", "false", "">;
+// defm : EnumField<"mlgo-model","llvm::EmitCModelChoice","llvm::EmitCModelChoice::Default","default",["llvm::EmitCModelChoice::Default"],
+//  "Select the MLGO model to execute">;
+    
+
+
+    
+    
 
 // // MemoryDependenceAnalysis.cpp
 // defm : ValueField<"memdep-block-number-limit", "unsigned", "200",

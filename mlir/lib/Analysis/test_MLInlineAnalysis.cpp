@@ -66,21 +66,24 @@ enum class EmitCModelChoice {
 #include "llvm/Analysis/InlinerModels.def"
 };
 
-// static llvm::cl::opt<EmitCModelChoice> SelectedMLGOModel(
-//     "mlgo-model", llvm::cl::desc("Select the MLGO model to execute:"),
-//     llvm::cl::init(EmitCModelChoice::Default),
-//     llvm::cl::values(clEnumValN(EmitCModelChoice::Default, "default",
-//                                 "Use standard heuristic")
-// #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
-//   , clEnumValN(EmitCModelChoice::CLASS_NAME, CLI_FLAG,                         \
-//                "Use the " CLI_FLAG " MLGO model")
-// #include "llvm/Analysis/InlinerModels.def"
-//                          ));
+EmitCModelChoice getSelectedMLGOModel() {
+  static llvm::cl::opt<EmitCModelChoice> SelectedMLGOModel(
+    "mlgo-model", llvm::cl::desc("Select the MLGO model to execute:"),
+    llvm::cl::init(EmitCModelChoice::Default),
+    llvm::cl::values(clEnumValN(EmitCModelChoice::Default, "default",
+                                "Use standard heuristic")
+#define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
+  , clEnumValN(EmitCModelChoice::CLASS_NAME, CLI_FLAG,                         \
+               "Use the " CLI_FLAG " MLGO model")
+#include "llvm/Analysis/InlinerModels.def"
+                         ));
+  return SelectedMLGOModel;
+}
 
 // static std::unique_ptr<llvm::MLModelRunner>
 // createEmitCModelRunner(LLVMContext &Ctx,
 //                        const std::vector<llvm::TensorSpec> &InputFeatures) {
-//   switch (SelectedMLGOModel) {
+//   switch (getSelectedMLGOModel()) {
 //   case EmitCModelChoice::Default:
 //     return nullptr;
 // #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
