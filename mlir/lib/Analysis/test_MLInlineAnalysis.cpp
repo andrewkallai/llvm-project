@@ -22,13 +22,13 @@
 #include "llvm/Analysis/InlineModelFeatureMaps.h"
 #include "llvm/Analysis/LazyCallGraph.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/MLModelRunner.h"
+// #include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/TensorSpec.h"
-#include "llvm/Analysis/Utils/MLGOUtils.h"
+// #include "llvm/Analysis/Utils/MLGOUtils.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
@@ -40,6 +40,8 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Analysis/SymbolTableAnalysis.h"
+#include "mlir/Analysis/MLGOUtils.h"
+#include "mlir/Analysis/MLModelRunner.h"
 
 
 
@@ -57,16 +59,17 @@ using CompiledModelType = llvm::InlinerSizeModel;
 using CompiledModelType = llvm::NoopSavedModelImpl;
 #endif
 
-#include "llvm/Analysis/EmitCModelRunner.h"
-#include "llvm/Analysis/InlinerModels.h"
+// #include "llvm/Analysis/EmitCModelRunner.h"
+#include "mlir/Analysis/EmitCModelRunner.h"
+#include "mlir/Analysis/InlinerModels.h"
 
 enum class EmitCModelChoice {
   Default,
 #define MLGO_MODEL(CLASS_NAME, CLI_FLAG) CLASS_NAME,
-#include "llvm/Analysis/InlinerModels.def"
+#include "mlir/Analysis/InlinerModels.def"
 };
 
-EmitCModelChoice getSelectedMLGOModel() {
+static EmitCModelChoice getSelectedMLGOModel() {
   static llvm::cl::opt<EmitCModelChoice> SelectedMLGOModel(
     "mlgo-model", llvm::cl::desc("Select the MLGO model to execute:"),
     llvm::cl::init(EmitCModelChoice::Default),
@@ -75,23 +78,30 @@ EmitCModelChoice getSelectedMLGOModel() {
 #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
   , clEnumValN(EmitCModelChoice::CLASS_NAME, CLI_FLAG,                         \
                "Use the " CLI_FLAG " MLGO model")
-#include "llvm/Analysis/InlinerModels.def"
+#include "mlir/Analysis/InlinerModels.def"
                          ));
   return SelectedMLGOModel;
 }
 
-// static std::unique_ptr<llvm::MLModelRunner>
-// createEmitCModelRunner(LLVMContext &Ctx,
-//                        const std::vector<llvm::TensorSpec> &InputFeatures) {
-//   switch (getSelectedMLGOModel()) {
-//   case EmitCModelChoice::Default:
-//     return nullptr;
-// #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
-//   case EmitCModelChoice::CLASS_NAME:                                           \
-//     return std::make_unique<EmitCModelRunner<CLASS_NAME>>(Ctx, InputFeatures);
-// #include "llvm/Analysis/InlinerModels.def"
-//   }
-//   llvm_unreachable("Unknown MLGO model type!");
+// static std::unique_ptr<llvm::MLModelRunner> getCreateEmitCModelRunner() {
+  // static std::unique_ptr<llvm::MLModelRunner>
+  static std::unique_ptr<MLModelRunner>
+  // createEmitCModelRunner(LLVMContext &Ctx,
+  createEmitCModelRunner(MLIRContext &Ctx,
+                        const std::vector<llvm::TensorSpec> &InputFeatures) {
+    switch (getSelectedMLGOModel()) {
+    case EmitCModelChoice::Default:
+      return nullptr;
+  #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
+    case EmitCModelChoice::CLASS_NAME:                                           \
+      return std::make_unique<EmitCModelRunner<CLASS_NAME>>(Ctx, InputFeatures);
+      // return std::make_unique<EmitCModelRunner<llvm::CLASS_NAME>>(Ctx, InputFeatures);
+      // return std::make_unique<llvm::EmitCModelRunner<CLASS_NAME>>(Ctx, InputFeatures);
+  #include "mlir/Analysis/InlinerModels.def"
+    }
+    llvm_unreachable("Unknown MLGO model type!");
+  }
+  // return createEmitCModelRunner;
 // }
 
 // std::unique_ptr<MLInlineAdvisor>
@@ -182,7 +192,7 @@ MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
 MLInlineAdvisor::MLInlineAdvisor(
     ModuleOp &moduleOp, AnalysisManager &AM,
     std::function<
-        std::unique_ptr<llvm::MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
+        std::unique_ptr<MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
         GetModelRunner,
     std::function<bool(CallOpInterface &)> GetDefaultAdvice)
     // : Opts(llvm::getAnalysisOptions(moduleOp)), GetDefaultAdvice(GetDefaultAdvice),

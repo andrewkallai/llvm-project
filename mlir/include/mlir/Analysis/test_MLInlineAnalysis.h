@@ -12,7 +12,7 @@
 #include "llvm/Analysis/FunctionPropertiesAnalysis.h"
 #include "llvm/Analysis/InlineAdvisor.h"
 #include "llvm/Analysis/LazyCallGraph.h"
-#include "llvm/Analysis/MLModelRunner.h"
+// #include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/IR/PassManager.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Interfaces/CallInterfaces.h"
@@ -21,6 +21,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Analysis/CallGraph.h"
+#include "mlir/Analysis/MLModelRunner.h"
 
 
 
@@ -51,7 +52,7 @@ class MLInlineAdvisor {
 public:
 /*HERE*/
   MLInlineAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
-                  std::function<std::unique_ptr<llvm::MLModelRunner>(
+                  std::function<std::unique_ptr<MLModelRunner>(
                       const std::vector<llvm::TensorSpec> &)>
                       GetModelRunner,
                   std::function<bool(CallOpInterface &)> GetDefaultAdvice);

@@ -23,6 +23,44 @@
 
 add_subdirectory(Presburger)
 
+#include(MLGOLower)
+#mlgo_lower_models(
+#  "${LLVM_MLGO_MODELS}"
+#  "${LLVM_MLGO_MLIR_OPT}"
+#  "${LLVM_MLGO_MLIR_TRANSLATE}"
+#  inliner
+#  #llvm/Analysis
+#  mlir/Analysis
+#  InlinerModels
+#  "models/inline-oz-test-model.inc"
+#  "${LLVM_MAIN_SRC_DIR}/../mlir/test/Integration/Dialect/EmitC/inline-oz-test-model-tosa.mlir"
+#  MLDeps
+#)
+#if (DEFINED LLVM_HAVE_TF_AOT OR LLVM_HAVE_TFLITE)
+#  include(TensorFlowCompile)
+#  set(LLVM_INLINER_MODEL_PATH_DEFAULT "models/inliner-Oz")
+#
+#  set(LLVM_INLINER_MODEL_CURRENT_URL "<UNSPECIFIED>" CACHE STRING "URL to download the LLVM inliner model")
+#
+#  if (DEFINED LLVM_HAVE_TF_AOT)
+#    tf_find_and_compile(
+#      ${LLVM_INLINER_MODEL_PATH}
+#      ${LLVM_INLINER_MODEL_CURRENT_URL}
+#      ${LLVM_INLINER_MODEL_PATH_DEFAULT}
+#      "models/gen-inline-oz-test-model.py"
+#      serve
+#      action
+#      InlinerSizeModel
+#      llvm::InlinerSizeModel
+#    )
+#  endif()
+#
+#  if (LLVM_HAVE_TFLITE)
+#    list(APPEND MLLinkDeps
+#      tensorflow-lite::tensorflow-lite)
+#  endif()
+#endif()
+
 # Keep source ownership separate from the umbrella archive below. Object
 # libraries let both archives reuse the same compilations, including in shared
 # library builds.
@@ -38,6 +76,8 @@ add_mlir_library(MLIRAnalysisBase
   SliceWalk.cpp
   TopologicalSortUtils.cpp
   test_MLInlineAnalysis.cpp
+#  ${GeneratedMLSources}
+
 
   OBJECT
   PARTIAL_SOURCES_INTENDED
@@ -47,6 +87,8 @@ add_mlir_library(MLIRAnalysisBase
 
   DEPENDS
   MLIRAnalysisOptions
+#  ${MLDeps}
+
 
   LINK_LIBS PUBLIC
   MLIRCallInterfaces
@@ -56,6 +98,8 @@ add_mlir_library(MLIRAnalysisBase
   MLIRIR
   MLIRSideEffectInterfaces
   MLIRViewLikeInterface
+#  ${MLLinkDeps}
+
   )
 
 add_mlir_library(MLIRAnalysisDataFlow
