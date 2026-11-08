@@ -12,14 +12,16 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_ANALYSIS_UTILS_MLGOUTILS_H
-#define LLVM_ANALYSIS_UTILS_MLGOUTILS_H
+// #ifndef LLVM_ANALYSIS_UTILS_MLGOUTILS_H
+// #define LLVM_ANALYSIS_UTILS_MLGOUTILS_H
+#ifndef MLIR_ANALYSIS_UTILS_MLGOUTILS_H
+#define MLIR_ANALYSIS_UTILS_MLGOUTILS_H
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Analysis/InteractiveModelRunner.h"
+// #include "llvm/Analysis/InteractiveModelRunner.h"
 // #include "llvm/Analysis/MLModelRunner.h"
 #include "mlir/Analysis/MLModelRunner.h"
-#include "llvm/Analysis/ReleaseModeModelRunner.h"
+// #include "llvm/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Analysis/TensorSpec.h"
 // #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/CommandLine.h"
@@ -27,6 +29,8 @@
 #include <string>
 #include <vector>
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/Analysis/InteractiveModelRunner.h"
+#include "mlir/Analysis/ReleaseModeModelRunner.h"
 
 
 namespace mlir {
@@ -39,7 +43,7 @@ bool isReleaseModelValid(
     llvm::StringRef InteractiveChannelBaseName,
     const llvm::cl::opt<EnumType, ExternalStorage, ParserClass> &SelectedModel,
     EnumType DefaultModelVal = EnumType::Default) {
-  return llvm::isEmbeddedModelEvaluatorValid<CompiledModelType>() ||
+  return isEmbeddedModelEvaluatorValid<CompiledModelType>() ||
          !InteractiveChannelBaseName.empty() ||
          SelectedModel != DefaultModelVal;
 }
@@ -50,7 +54,7 @@ template <class CompiledModelType, class EnumType>
 bool isReleaseModelValid(llvm::StringRef InteractiveChannelBaseName,
                          EnumType SelectedModel,
                          EnumType DefaultModelVal = EnumType::Default) {
-  return llvm::isEmbeddedModelEvaluatorValid<CompiledModelType>() ||
+  return isEmbeddedModelEvaluatorValid<CompiledModelType>() ||
          !InteractiveChannelBaseName.empty() ||
          SelectedModel != DefaultModelVal;
 }
@@ -61,23 +65,23 @@ bool isReleaseModelValid(llvm::StringRef InteractiveChannelBaseName,
 /// 3. ReleaseModeModelRunner<CompiledModelType> if an embedded AOT model is
 ///    available.
 template <class CompiledModelType, class CreateEmitCFunc>
-std::unique_ptr<llvm::MLModelRunner> createReleaseModeModelRunner(
+std::unique_ptr<MLModelRunner> createReleaseModeModelRunner(
     MLIRContext &Ctx, const std::vector<llvm::TensorSpec> &InputFeatures,
     // LLVMContext &Ctx, const std::vector<TensorSpec> &InputFeatures,
     llvm::StringRef DecisionName, const std::string &InteractiveChannelBaseName,
     const llvm::TensorSpec &InteractiveDecisionSpec,
     CreateEmitCFunc &&CreateEmitCModelRunner,
-    const llvm::EmbeddedModelRunnerOptions &Options = {}) {
+    const EmbeddedModelRunnerOptions &Options = {}) {
   if (!InteractiveChannelBaseName.empty()) {
-    return std::make_unique<llvm::InteractiveModelRunner>(
+    return std::make_unique<InteractiveModelRunner>(
         Ctx, InputFeatures, InteractiveDecisionSpec,
         InteractiveChannelBaseName + ".out",
         InteractiveChannelBaseName + ".in");
   }
   if (auto EmitCRunner = CreateEmitCModelRunner(Ctx, InputFeatures))
     return EmitCRunner;
-  if (llvm::isEmbeddedModelEvaluatorValid<CompiledModelType>()) {
-    auto Runner = std::make_unique<llvm::ReleaseModeModelRunner<CompiledModelType>>(
+  if (isEmbeddedModelEvaluatorValid<CompiledModelType>()) {
+    auto Runner = std::make_unique<ReleaseModeModelRunner<CompiledModelType>>(
         Ctx, InputFeatures, DecisionName, Options);
     // Shapes the model was compiled for do not match the requested ones. The
     // error is already reported, so let the caller fall back.
@@ -90,4 +94,5 @@ std::unique_ptr<llvm::MLModelRunner> createReleaseModeModelRunner(
 
 } // namespace llvm
 
-#endif // LLVM_ANALYSIS_UTILS_MLGOUTILS_H
+// #endif // LLVM_ANALYSIS_UTILS_MLGOUTILS_H
+#endif // MLIR_ANALYSIS_UTILS_MLGOUTILS_H

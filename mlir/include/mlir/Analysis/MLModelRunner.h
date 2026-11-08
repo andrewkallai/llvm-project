@@ -7,8 +7,10 @@
 //===----------------------------------------------------------------------===//
 //
 
-#ifndef LLVM_ANALYSIS_MLMODELRUNNER_H
-#define LLVM_ANALYSIS_MLMODELRUNNER_H
+// #ifndef LLVM_ANALYSIS_MLMODELRUNNER_H
+// #define LLVM_ANALYSIS_MLMODELRUNNER_H
+#ifndef MLIR_ANALYSIS_MLMODELRUNNER_H
+#define MLIR_ANALYSIS_MLMODELRUNNER_H
 
 #include "llvm/Analysis/TensorSpec.h"
 #include "llvm/IR/PassManager.h"
@@ -62,7 +64,7 @@ protected:
   }
   virtual void *evaluateUntyped() = 0;
 
-  void setUpBufferForTensor(size_t Index, const TensorSpec &Spec,
+  void setUpBufferForTensor(size_t Index, const llvm::TensorSpec &Spec,
                             void *Buffer) {
     if (!Buffer) {
       OwnedBuffers.emplace_back(Spec.getTotalTensorBufferSize());
@@ -81,4 +83,5 @@ private:
 };
 } // namespace llvm
 
-#endif // LLVM_ANALYSIS_MLMODELRUNNER_H
+// #endif // LLVM_ANALYSIS_MLMODELRUNNER_H
+#endif // MLIR_ANALYSIS_MLMODELRUNNER_H

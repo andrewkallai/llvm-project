@@ -91,6 +91,8 @@ const AnalysisOptions &getAnalysisOptions();
 
 const AnalysisOptions &getAnalysisOptions(Operation &op);
 
+const AnalysisOptions &getAnalysisOptions(ModuleOp &op);
+
 } // namespace mlir
 #endif // LLVM_LIB_ANALYSIS_ANALYSISOPTIONS_H
 

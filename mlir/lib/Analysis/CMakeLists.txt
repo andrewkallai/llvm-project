@@ -24,7 +24,7 @@
 add_subdirectory(Presburger)
 
 #include(MLGOLower)
-#mlgo_lower_models(
+#mlir_mlgo_lower_models(
 #  "${LLVM_MLGO_MODELS}"
 #  "${LLVM_MLGO_MLIR_OPT}"
 #  "${LLVM_MLGO_MLIR_TRANSLATE}"
@@ -32,7 +32,7 @@ add_subdirectory(Presburger)
 #  #llvm/Analysis
 #  mlir/Analysis
 #  InlinerModels
-#  "models/inline-oz-test-model.inc"
+#  "${LLVM_MAIN_SRC_DIR}/lib/Analysis/models/inline-oz-test-model.inc"
 #  "${LLVM_MAIN_SRC_DIR}/../mlir/test/Integration/Dialect/EmitC/inline-oz-test-model-tosa.mlir"
 #  MLDeps
 #)

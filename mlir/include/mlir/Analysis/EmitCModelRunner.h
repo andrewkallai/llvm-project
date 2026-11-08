@@ -11,8 +11,10 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_ANALYSIS_EMITCMODELRUNNER_H
-#define LLVM_ANALYSIS_EMITCMODELRUNNER_H
+// #ifndef LLVM_ANALYSIS_EMITCMODELRUNNER_H
+// #define LLVM_ANALYSIS_EMITCMODELRUNNER_H
+#ifndef MLIR_ANALYSIS_EMITCMODELRUNNER_H
+#define MLIR_ANALYSIS_EMITCMODELRUNNER_H
 
 #include "mlir/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/TensorSpec.h"
@@ -63,4 +65,5 @@ private:
 
 } // namespace llvm
 
-#endif // LLVM_ANALYSIS_EMITCMODELRUNNER_H
+#endif // MLIR_ANALYSIS_EMITCMODELRUNNER_H
+// #endif // LLVM_ANALYSIS_EMITCMODELRUNNER_H

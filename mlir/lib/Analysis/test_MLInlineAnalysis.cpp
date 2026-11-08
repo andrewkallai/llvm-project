@@ -25,7 +25,7 @@
 // #include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
-#include "llvm/Analysis/ReleaseModeModelRunner.h"
+// #include "llvm/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/TensorSpec.h"
 // #include "llvm/Analysis/Utils/MLGOUtils.h"
@@ -42,6 +42,7 @@
 #include "mlir/Analysis/SymbolTableAnalysis.h"
 #include "mlir/Analysis/MLGOUtils.h"
 #include "mlir/Analysis/MLModelRunner.h"
+#include "mlir/Analysis/ReleaseModeModelRunner.h"
 
 
 
@@ -56,17 +57,19 @@ using namespace mlir;
 #include "InlinerSizeModel.h" // NOLINT
 using CompiledModelType = llvm::InlinerSizeModel;
 #else
-using CompiledModelType = llvm::NoopSavedModelImpl;
+using CompiledModelType = NoopSavedModelImpl;
 #endif
 
 // #include "llvm/Analysis/EmitCModelRunner.h"
 #include "mlir/Analysis/EmitCModelRunner.h"
-#include "mlir/Analysis/InlinerModels.h"
+// #include "mlir/Analysis/InlinerModels.h"
+#include "llvm/Analysis/InlinerModels.h"
 
 enum class EmitCModelChoice {
   Default,
 #define MLGO_MODEL(CLASS_NAME, CLI_FLAG) CLASS_NAME,
-#include "mlir/Analysis/InlinerModels.def"
+// #include "mlir/Analysis/InlinerModels.def"
+#include "llvm/Analysis/InlinerModels.def"
 };
 
 static EmitCModelChoice getSelectedMLGOModel() {
@@ -78,7 +81,8 @@ static EmitCModelChoice getSelectedMLGOModel() {
 #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
   , clEnumValN(EmitCModelChoice::CLASS_NAME, CLI_FLAG,                         \
                "Use the " CLI_FLAG " MLGO model")
-#include "mlir/Analysis/InlinerModels.def"
+// #include "mlir/Analysis/InlinerModels.def"
+#include "llvm/Analysis/InlinerModels.def"
                          ));
   return SelectedMLGOModel;
 }
@@ -94,35 +98,36 @@ static EmitCModelChoice getSelectedMLGOModel() {
       return nullptr;
   #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
     case EmitCModelChoice::CLASS_NAME:                                           \
-      return std::make_unique<EmitCModelRunner<CLASS_NAME>>(Ctx, InputFeatures);
-      // return std::make_unique<EmitCModelRunner<llvm::CLASS_NAME>>(Ctx, InputFeatures);
+      return std::make_unique<EmitCModelRunner<llvm::CLASS_NAME>>(Ctx, InputFeatures);
+      // return std::make_unique<EmitCModelRunner<CLASS_NAME>>(Ctx, InputFeatures);
       // return std::make_unique<llvm::EmitCModelRunner<CLASS_NAME>>(Ctx, InputFeatures);
-  #include "mlir/Analysis/InlinerModels.def"
+  // #include "mlir/Analysis/InlinerModels.def"
+  #include "llvm/Analysis/InlinerModels.def"
     }
     llvm_unreachable("Unknown MLGO model type!");
   }
   // return createEmitCModelRunner;
 // }
 
-// std::unique_ptr<MLInlineAdvisor>
-// llvm::getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
-//                             std::function<bool(CallBase &)> GetDefaultAdvice) {
-//   const AnalysisOptions &Opts = getAnalysisOptions(moduleOp);
-//   if (!isReleaseModelValid<CompiledModelType>(
-//           Opts.inliner_interactive_channel_base, SelectedMLGOModel))
-//     return nullptr;
-//   auto RunnerFactory = [&](const std::vector<TensorSpec> &InputFeatures)
-//       -> std::unique_ptr<MLModelRunner> {
-//     return createReleaseModeModelRunner<CompiledModelType>(
-//         moduleOp.getContext(), InputFeatures, DecisionName,
-//         Opts.inliner_interactive_channel_base.str(), InlineDecisionSpec,
-//         createEmitCModelRunner,
-//         EmbeddedModelRunnerOptions().setModelSelector(
-//             Opts.ml_inliner_model_selector));
-//   };
-//   return std::make_unique<MLInlineAdvisor>(moduleOp, AM, RunnerFactory,
-//                                            GetDefaultAdvice);
-// }
+std::unique_ptr<MLInlineAdvisor>
+getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
+                            std::function<bool(CallOpInterface &)> GetDefaultAdvice) {
+  const AnalysisOptions &Opts = getAnalysisOptions(moduleOp);
+  if (!isReleaseModelValid<CompiledModelType>(
+          Opts.inliner_interactive_channel_base, getSelectedMLGOModel()))
+    return nullptr;
+  auto RunnerFactory = [&](const std::vector<llvm::TensorSpec> &InputFeatures)
+      -> std::unique_ptr<MLModelRunner> {
+    return createReleaseModeModelRunner<CompiledModelType>(
+        *moduleOp.getContext(), InputFeatures, llvm::DecisionName,
+        Opts.inliner_interactive_channel_base.str(), llvm::InlineDecisionSpec,
+        createEmitCModelRunner,
+        EmbeddedModelRunnerOptions().setModelSelector(
+            Opts.ml_inliner_model_selector));
+  };
+  return std::make_unique<MLInlineAdvisor>(moduleOp, AM, RunnerFactory,
+                                           GetDefaultAdvice);
+}
 
 #define DEBUG_TYPE "inline-ml"
 
@@ -195,8 +200,8 @@ MLInlineAdvisor::MLInlineAdvisor(
         std::unique_ptr<MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
         GetModelRunner,
     std::function<bool(CallOpInterface &)> GetDefaultAdvice)
-    // : Opts(llvm::getAnalysisOptions(moduleOp)), GetDefaultAdvice(GetDefaultAdvice),
-    : GetDefaultAdvice(GetDefaultAdvice),
+    : Opts(getAnalysisOptions(moduleOp)), GetDefaultAdvice(GetDefaultAdvice),
+    // : GetDefaultAdvice(GetDefaultAdvice),
       FeatureMap(getInitialFeatureMap()),
       CG(AM.getAnalysis<CallGraph>()),
       InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize),
@@ -292,8 +297,8 @@ MLInlineAdvisor::MLInlineAdvisor(
   //   FeatureMap.push_back(
   //       TensorSpec::createSpec<float>("caller_embedding", {IR2VecDim}));
   // }
-  // if (Opts.inliner_interactive_include_default)
-  //   FeatureMap.push_back(DefaultDecisionSpec);
+  if (Opts.inliner_interactive_include_default)
+    FeatureMap.push_back(llvm::DefaultDecisionSpec);
 
   ModelRunner = GetModelRunner(getFeatureMap());
   if (!ModelRunner) {
@@ -302,7 +307,7 @@ MLInlineAdvisor::MLInlineAdvisor(
     return;
   }
   ModelRunner->switchContext("");
-  // ForceStop = Opts.ml_inliner_stop_immediately;
+  ForceStop = Opts.ml_inliner_stop_immediately;
 }
 
 /*HERE*/
@@ -481,17 +486,18 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface C
   FunctionOpInterface Callee = cast<FunctionOpInterface>(calleeOp);
 
   // if (Opts.ml_inliner_skip_policy == SkipMLPolicyCriteria::IfCallerIsNotCold) {
-    // if (!PSI.isFunctionEntryCold(&Caller)) {
-    //   // Return a MLInlineAdvice, despite delegating to the default advice,
-    //   // because we need to keep track of the internal state. This is different
-    //   // from the other instances where we return a "default" InlineAdvice,
-    //   // which happen at points we won't come back to the MLAdvisor for
-    //   // decisions requiring that state.
-    //   return ForceStop ? std::make_unique<InlineAdvice>(this, CB, ORE,
-    //                                                     GetDefaultAdvice(CB))
-    //                    : std::make_unique<MLInlineAdvice>(this, CB, ORE,
-    //                                                       GetDefaultAdvice(CB));
-    // }
+  //   if (!PSI.isFunctionEntryCold(&Caller)) {
+  //     // Return a MLInlineAdvice, despite delegating to the default advice,
+  //     // because we need to keep track of the internal state. This is different
+  //     // from the other instances where we return a "default" InlineAdvice,
+  //     // which happen at points we won't come back to the MLAdvisor for
+  //     // decisions requiring that state.
+  //     // return ForceStop ? std::make_unique<llvm::InlineAdvice>(this, CB, ORE,
+  //     //                                                   GetDefaultAdvice(CB))
+  //     //                  : std::make_unique<MLInlineAdvice>(this, CB, ORE,
+  //     //                                                     GetDefaultAdvice(CB));
+
+  //   }
   // }
   // auto MandatoryKind = InlineAdvisor::getMandatoryKind(CB, FAM, ORE);
   // If this is a "never inline" case, there won't be any changes to internal
@@ -604,8 +610,8 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface C
   //       static_cast<llvm::InlineCostFeatureIndex>(I))) = CostFeatures->at(I);
   // }
   // This one would have been set up to be right at the end.
-  // if (!Opts.inliner_interactive_channel_base.empty() &&
-      // Opts.inliner_interactive_include_default)
+  if (!Opts.inliner_interactive_channel_base.empty() &&
+      Opts.inliner_interactive_include_default)
     *ModelRunner->getTensor<int64_t>(getFeatureMap().size() - 1) =
         GetDefaultAdvice(CB);
   return getAdviceFromModel(CB);

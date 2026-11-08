@@ -6,8 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_ANALYSIS_MLINLINEADVISOR_H
-#define LLVM_ANALYSIS_MLINLINEADVISOR_H
+// #ifndef LLVM_ANALYSIS_MLINLINEADVISOR_H
+// #define LLVM_ANALYSIS_MLINLINEADVISOR_H
+#ifndef MLIR_ANALYSIS_MLINLINEADVISOR_H
+#define MLIR_ANALYSIS_MLINLINEADVISOR_H
 
 #include "llvm/Analysis/FunctionPropertiesAnalysis.h"
 #include "llvm/Analysis/InlineAdvisor.h"
@@ -75,7 +77,7 @@ public:
   bool isForcedToStop() const { return ForceStop; }
   // int64_t getLocalCalls(Function &F);
   int64_t getLocalCalls(FunctionOpInterface &F);
-  const llvm::MLModelRunner &getModelRunner() const { return *ModelRunner; }
+  const MLModelRunner &getModelRunner() const { return *ModelRunner; }
   // FunctionPropertiesInfo &getCachedFPI(Function &) const;
   llvm::FunctionPropertiesInfo &getCachedFPI(FunctionOpInterface) const;
   const std::vector<llvm::TensorSpec> &getFeatureMap() const { return FeatureMap; };
@@ -109,8 +111,8 @@ protected:
   // unsigned getInitialFunctionLevel(const Function &F) const;
   unsigned getInitialFunctionLevel(FunctionOpInterface F) const;
 
-  // const AnalysisOptions &Opts;
-  std::unique_ptr<llvm::MLModelRunner> ModelRunner;
+  const AnalysisOptions &Opts;
+  std::unique_ptr<MLModelRunner> ModelRunner;
   // std::function<bool(CallBase &)> GetDefaultAdvice;
   std::function<bool(CallOpInterface &)> GetDefaultAdvice;
   std::vector<llvm::TensorSpec> FeatureMap;
@@ -201,4 +203,5 @@ private:
 
 } // namespace llvm
 
-#endif // LLVM_ANALYSIS_MLINLINEADVISOR_H
+#endif // MLIR_ANALYSIS_MLINLINEADVISOR_H
+// #endif // LLVM_ANALYSIS_MLINLINEADVISOR_H
