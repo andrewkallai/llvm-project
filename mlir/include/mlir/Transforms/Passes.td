@@ -336,6 +336,20 @@ def InlinerPass : Pass<"inline"> {
            "in the caller exceeds this value (in percentage), "
            "then the callee is not inlined even if it is legal "
            "to inline it">,
+    Option<"inliningAdvisorMode", "enable-ml-inliner",
+           "llvm::InliningAdvisorMode",
+           /*default=*/"llvm::InliningAdvisorMode::Default",
+           "Enable ML policy for inliner. Currently trained for -Oz only",
+           [{
+             llvm::cl::values(
+                 clEnumValN(llvm::InliningAdvisorMode::Default, "default",
+                            "Heuristics-based inliner version"),
+                 clEnumValN(llvm::InliningAdvisorMode::Development,
+                            "development",
+                            "Use development mode (runtime-loadable model)"),
+                 clEnumValN(llvm::InliningAdvisorMode::Release, "release",
+                            "Use release mode (AOT-compiled model)"))
+           }]>,
   ];
 }
 
