@@ -149,19 +149,19 @@ static std::vector<llvm::TensorSpec> FeatureMap{
 // struct MyOperationAnalysis {
   // MyOperationAnalysis(Operation *op);
 
-const char *const llvm::DecisionName = "inlining_decision";
+const char *const DecisionName = "inlining_decision";
 const llvm::TensorSpec &getInlineDecisionSpec() {
   static const llvm::TensorSpec decisionNameSpec =
-      llvm::TensorSpec::createSpec<int64_t>(llvm::DecisionName, {1});
+      llvm::TensorSpec::createSpec<int64_t>(DecisionName, {1});
   return decisionNameSpec;
 }
-const char *const llvm::DefaultDecisionName = "inlining_default";
+const char *const DefaultDecisionName = "inlining_default";
 const llvm::TensorSpec &getDefaultDecisionSpec() {
   static const llvm::TensorSpec defaultDecisionNameSpec =
-      llvm::TensorSpec::createSpec<int64_t>(llvm::DefaultDecisionName, {1});
+      llvm::TensorSpec::createSpec<int64_t>(DefaultDecisionName, {1});
   return defaultDecisionNameSpec;
 }
-const char *const llvm::RewardName = "delta_size";
+const char *const RewardName = "delta_size";
 
 CallOpInterface getInlinableCS(CallOpInterface callOp, 
                                       SymbolTableCollection &symbolTable) {
@@ -190,8 +190,50 @@ CallOpInterface getInlinableCS(CallOpInterface callOp,
 
 MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
     : moduleOp(cast<ModuleOp>(op)) {
+}
+
+// bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
+void getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
+
   // Initialize the MLInlineAdvisor with the provided operation and analysis manager.
-  // MLInlineAdvisor(moduleOp, am);
+  // MLInlineAdvisor(moduleOp, AM);
+//   InliningAdvisorMode Mode;
+//   auto GetDefaultAdvice = [&AM, Params](CallBase &CB) {
+//     auto OIC = getDefaultInlineAdvice(CB, AM, Params);
+//     return OIC.has_value();
+//   };
+//   switch (Mode) {
+//   case InliningAdvisorMode::Default:
+//     LLVM_DEBUG(dbgs() << "Using default inliner heuristic.\n");
+//     Advisor.reset(new DefaultInlineAdvisor(M, FAM, Params, IC));
+//     // Restrict replay to default advisor, ML advisors are stateful so
+//     // replay will need augmentations to interleave with them correctly.
+//     if (!ReplaySettings.ReplayFile.empty()) {
+//       Advisor = llvm::getReplayInlineAdvisor(M, FAM, M.getContext(),
+//                                              std::move(Advisor), ReplaySettings,
+//                                              /* EmitRemarks =*/true, IC);
+//     }
+//     break;
+//     // Run IR2VecVocabAnalysis once per module to get the vocabulary.
+//     // We run it here because it is immutable and we want to avoid running it
+//     // multiple times.
+//   case InliningAdvisorMode::Development:
+// #ifdef LLVM_HAVE_TFLITE
+//     LLVM_DEBUG(dbgs() << "Using development-mode inliner policy.\n");
+//     if (!InlineAdvisorAnalysis::initializeIR2VecVocabIfRequested(M, MAM))
+//       return false;
+//     Advisor = llvm::getDevelopmentModeAdvisor(M, MAM, GetDefaultAdvice);
+// #endif
+//     break;
+//   case InliningAdvisorMode::Release:
+//     LLVM_DEBUG(dbgs() << "Using release-mode inliner policy.\n");
+//     if (!InlineAdvisorAnalysis::initializeIR2VecVocabIfRequested(M, MAM))
+//       return false;
+//     Advisor = llvm::getReleaseModeAdvisor(M, MAM, GetDefaultAdvice);
+//     break;
+//   }
+
+//   return !!Advisor;
 }
 
 MLInlineAdvisor::MLInlineAdvisor(

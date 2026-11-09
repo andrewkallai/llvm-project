@@ -40,11 +40,19 @@ class DiagnosticInfoOptimizationBase;
 class MLInlineAdvice;
 class ProfileSummaryInfo;
 
+// extern const char *const DecisionName;
+// extern const llvm::TensorSpec InlineDecisionSpec;
+// extern const char *const DefaultDecisionName;
+// extern const llvm::TensorSpec DefaultDecisionSpec;
+// extern const char *const RewardName;
+
 class MLInlineAnalysis {
 public:
-  MLInlineAnalysis(Operation *op, AnalysisManager &am);
+  MLInlineAnalysis(Operation *op, AnalysisManager &AM);
 
   ~MLInlineAnalysis() = default;
+
+  bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM);
 
 private:
   ModuleOp moduleOp;
