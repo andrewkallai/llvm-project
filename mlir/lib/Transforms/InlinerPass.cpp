@@ -201,7 +201,6 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
 void InlinerPass::runOnOperation() {
   CallGraph &cg = getAnalysis<CallGraph>();
 
-  MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
   // The inliner should only be run on operations that define a symbol table,
   // as the callgraph will need to resolve references.
   Operation *op = getOperation();
@@ -216,6 +215,7 @@ void InlinerPass::runOnOperation() {
     return isProfitableToInline(call, inliningThreshold);
   };
 
+
   llvm::InliningAdvisorMode Mode = inliningAdvisorMode.getValue();
   switch (Mode) {
   case llvm::InliningAdvisorMode::Default:
@@ -226,10 +226,16 @@ void InlinerPass::runOnOperation() {
     LDBG() << "Using development-mode inliner policy.";
     // Advisor = llvm::getDevelopmentModeAdvisor(M, MAM, GetDefaultAdvice);
 #endif
+    {
+      MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
+    }
     break;
   case llvm::InliningAdvisorMode::Release:
     LDBG() << "Using release-mode inliner policy.";
     // Advisor = llvm::getReleaseModeAdvisor(M, MAM, GetDefaultAdvice);
+    {
+      MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
+    }
     break;
   }
   // Get an instance of the inliner.
