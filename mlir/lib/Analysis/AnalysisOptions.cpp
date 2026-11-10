@@ -52,3 +52,10 @@ const AnalysisOptions &mlir::getAnalysisOptions() {
 const AnalysisOptions &mlir::getAnalysisOptions(Operation &op) {
   return getAnalysisOptions();
 }
+const AnalysisOptions &mlir::getAnalysisOptions(ModuleOp &moduleOp) {
+  return getAnalysisOptions();
+}
+
+const AnalysisOptions &mlir::getAnalysisOptions(MLIRContext &Ctx) {
+  return getAnalysisOptions();
+}

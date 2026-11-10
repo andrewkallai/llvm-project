@@ -279,9 +279,9 @@ def AnalysisOptions : OptionsStruct<"mlir">;
 // defm : BoolField<"ipt-expensive-asserts", "false",
 //   "Perform expensive assert validation on every query to Instruction Precedence Tracking">;
 
-// // InteractiveModelRunner.cpp
-// defm : BoolField<"interactive-model-runner-echo-reply", "false",
-//   "The InteractiveModelRunner will echo back to stderr the data received from the host (for debugging purposes)">;
+// InteractiveModelRunner.cpp
+ defm : BoolField<"interactive-model-runner-echo-reply", "false",
+   "The InteractiveModelRunner will echo back to stderr the data received from the host (for debugging purposes)">;
 
 // // LastRunTrackingAnalysis.cpp
 // defm : BoolField<"enable-last-run-tracking", "true",

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIB_ANALYSIS_ANALYSISOPTIONS_H
-#define LLVM_LIB_ANALYSIS_ANALYSISOPTIONS_H
+#ifndef MLIR_LIB_ANALYSIS_ANALYSISOPTIONS_H
+#define MLIR_LIB_ANALYSIS_ANALYSISOPTIONS_H
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LLVMContext.h"
@@ -93,8 +93,11 @@ const AnalysisOptions &getAnalysisOptions(Operation &op);
 
 const AnalysisOptions &getAnalysisOptions(ModuleOp &op);
 
+const AnalysisOptions &getAnalysisOptions(MLIRContext &Ctx);
+
+
 } // namespace mlir
-#endif // LLVM_LIB_ANALYSIS_ANALYSISOPTIONS_H
+#endif // MLIR_LIB_ANALYSIS_ANALYSISOPTIONS_H
 
 
 

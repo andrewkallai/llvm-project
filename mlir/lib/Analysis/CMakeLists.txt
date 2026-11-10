@@ -71,6 +71,7 @@ add_mlir_library(MLIRAnalysisBase
   CallGraph.cpp
   CFGLoopInfo.cpp
   DataLayoutAnalysis.cpp
+  InteractiveModelRunner.cpp
   Liveness.cpp
   SliceAnalysis.cpp
   SliceWalk.cpp
@@ -88,6 +89,9 @@ add_mlir_library(MLIRAnalysisBase
   DEPENDS
   MLIRAnalysisOptions
 #  ${MLDeps}
+
+  LINK_COMPONENTS
+  Analysis
 
 
   LINK_LIBS PUBLIC

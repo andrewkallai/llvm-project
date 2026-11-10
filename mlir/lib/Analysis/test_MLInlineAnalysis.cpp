@@ -242,7 +242,8 @@ MLInlineAdvisor::MLInlineAdvisor(
         std::unique_ptr<MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
         GetModelRunner,
     std::function<bool(CallOpInterface &)> GetDefaultAdvice)
-    : Opts(getAnalysisOptions(moduleOp)), GetDefaultAdvice(GetDefaultAdvice),
+    : moduleOp(moduleOp), AM(AM),
+      Opts(getAnalysisOptions(moduleOp)), GetDefaultAdvice(GetDefaultAdvice),
     // : GetDefaultAdvice(GetDefaultAdvice),
       FeatureMap(getInitialFeatureMap()),
       CG(AM.getAnalysis<CallGraph>()),
@@ -438,9 +439,9 @@ unsigned MLInlineAdvisor::getInitialFunctionLevel(FunctionOpInterface F) const {
 //   assert(EdgeCount >= EdgesOfLastSeenNodes);
 // }
 
-// int64_t MLInlineAdvisor::getLocalCalls(Function &F) {
-//   return getCachedFPI(F).DirectCallsToDefinedFunctions;
-// }
+int64_t MLInlineAdvisor::getLocalCalls(FunctionOpInterface &F) {
+  return getCachedFPI(F).DirectCallsToDefinedFunctions;
+}
 
 // // Update the internal state of the advisor, and force invalidate feature
 // // analysis. Currently, we maintain minimal (and very simple) global state - the
@@ -501,21 +502,56 @@ unsigned MLInlineAdvisor::getInitialFunctionLevel(FunctionOpInterface F) const {
 //   assert(CurrentIRSize >= 0 && EdgeCount >= 0 && NodeCount >= 0);
 // }
 
+int64_t MLInlineAdvisor::getModuleIRSize() const {
+  int64_t Ret = 0;
+  // for (auto &F : moduleOp)
+    // for (func::FuncOp F : moduleOp.getOps<func::FuncOp>()) {
+    // if (!F.isDeclaration())
+      // Ret += getIRSize(F);
+  // }
+  for (Operation &op : moduleOp.getBody()->getOperations()) {
+    if (auto F = dyn_cast<FunctionOpInterface>(&op))
+      if (!F.isExternal())
+        Ret += getIRSize(F);
+  }
+    // if (!F.isDeclaration())
+      // Ret += getIRSize(F);
+  return Ret;
+}
+
+//  for (Operation &op : moduleOp.getBody()->getOperations()) {
+//     auto F = dyn_cast<FunctionOpInterface>(&op);
+
+//     if (!F || F.isExternal())
+//       continue;
+
+//     Ret += getIRSize(F);
+//   }
+
 // int64_t MLInlineAdvisor::getModuleIRSize() const {
 //   int64_t Ret = 0;
-//   for (auto &F : M)
+
+//   for (func::FuncOp F : moduleOp.getOps<func::FuncOp>()) {
 //     if (!F.isDeclaration())
 //       Ret += getIRSize(F);
+//   }
+
 //   return Ret;
 // }
+llvm::FunctionPropertiesInfo &MLInlineAdvisor::getCachedFPI(FunctionOpInterface F) const {
+  auto InsertPair = FPICache.try_emplace(F.getOperation());
+  if (!InsertPair.second)
+    return InsertPair.first->second;
+   
+   auto &FPI = InsertPair.first->second;
 
-// FunctionPropertiesInfo &MLInlineAdvisor::getCachedFPI(Function &F) const {
-//   auto InsertPair = FPICache.try_emplace(&F);
-//   if (!InsertPair.second)
-//     return InsertPair.first->second;
-//   InsertPair.first->second = FAM.getResult<FunctionPropertiesAnalysis>(F);
-//   return InsertPair.first->second;
-// }
+   F.getOperation()->walk([&](Operation *op) {
+    if (op != F.getOperation())
+      ++FPI.TotalInstructionCount;
+  });
+
+  return FPI;
+}
 
 std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface CB) {
   if (auto Skip = getSkipAdviceIfUnreachableCallsite(CB))

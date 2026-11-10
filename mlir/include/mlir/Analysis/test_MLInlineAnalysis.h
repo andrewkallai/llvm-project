@@ -86,7 +86,7 @@ public:
   // int64_t getLocalCalls(Function &F);
   int64_t getLocalCalls(FunctionOpInterface &F);
   const MLModelRunner &getModelRunner() const { return *ModelRunner; }
-  // FunctionPropertiesInfo &getCachedFPI(Function &) const;
+  // llvm::FunctionPropertiesInfo &getCachedFPI(FunctionOpInterface &) const;
   llvm::FunctionPropertiesInfo &getCachedFPI(FunctionOpInterface) const;
   const std::vector<llvm::TensorSpec> &getFeatureMap() const { return FeatureMap; };
   static const std::vector<llvm::TensorSpec> &getInitialFeatureMap();
@@ -97,6 +97,8 @@ public:
 
 
 protected:
+  ModuleOp &moduleOp;
+  AnalysisManager &AM;
   // std::unique_ptr<InlineAdvice> getAdviceImpl(CallBase &CB) override;
   std::unique_ptr<MLInlineAdvice> getAdviceImpl(CallOpInterface CB);
 
@@ -136,7 +138,7 @@ private:
   // Using std::map to benefit from its iterator / reference non-invalidating
   // semantics, which make it easy to use `getCachedFPI` results from multiple
   // calls without needing to copy to avoid invalidation effects.
-  mutable std::map<const llvm::Function *, llvm::FunctionPropertiesInfo> FPICache;
+  mutable std::map<Operation *, llvm::FunctionPropertiesInfo> FPICache;
 
   // llvm::LazyCallGraph &CG;
   CallGraph &CG;
