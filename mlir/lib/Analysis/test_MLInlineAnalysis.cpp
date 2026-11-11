@@ -111,7 +111,7 @@ static EmitCModelChoice getSelectedMLGOModel() {
 
 std::unique_ptr<MLInlineAdvisor>
 getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
-                            std::function<bool(CallOpInterface &)> GetDefaultAdvice) {
+                            bool defaultAdvice) {
   const AnalysisOptions &Opts = getAnalysisOptions(moduleOp);
   if (!isReleaseModelValid<CompiledModelType>(
           Opts.inliner_interactive_channel_base, getSelectedMLGOModel()))
@@ -126,7 +126,7 @@ getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
             Opts.ml_inliner_model_selector));
   };
   return std::make_unique<MLInlineAdvisor>(moduleOp, AM, RunnerFactory,
-                                           GetDefaultAdvice);
+                                           defaultAdvice);
 }
 
 #define DEBUG_TYPE "inline-ml"
@@ -189,11 +189,12 @@ CallOpInterface getInlinableCS(CallOpInterface callOp,
 // };
 
 MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
-    : moduleOp(cast<ModuleOp>(op)) {
+    : moduleOp(cast<ModuleOp>(op)), AM(AM) {
 }
 
 // bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
-void getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
+std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
+MLInlineAnalysis::getReleaseModeAdvisorFunction() {
 
   // Initialize the MLInlineAdvisor with the provided operation and analysis manager.
   // MLInlineAdvisor(moduleOp, AM);
@@ -234,6 +235,25 @@ void getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
 //   }
 
 //   return !!Advisor;
+    // return MLInlineAdvisor(moduleOp, AM, defaultAdvice);
+  // std::unique_ptr<MLInlineAdvisor>
+  // getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
+                      // std::function<bool(CallOpInterface &)> GetDefaultAdvice);
+
+  auto releaseModeAdvisorFunc = [this](bool defaultAdvice) {
+           return getReleaseModeAdvisor(moduleOp, AM, defaultAdvice);
+  }; 
+  return releaseModeAdvisorFunc;
+}
+
+std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
+MLInlineAnalysis::getDevelopmentModeAdvisorFunction() {
+  auto developmentModeAdvisorFunc = [this](bool defaultAdvice) {
+          //  return llvm::getDevelopmentModeAdvisor(moduleOp, AM, defaultAdvice);
+                      return getReleaseModeAdvisor(moduleOp, AM, defaultAdvice);
+
+  }; 
+  return developmentModeAdvisorFunc;
 }
 
 MLInlineAdvisor::MLInlineAdvisor(
@@ -241,10 +261,9 @@ MLInlineAdvisor::MLInlineAdvisor(
     std::function<
         std::unique_ptr<MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
         GetModelRunner,
-    std::function<bool(CallOpInterface &)> GetDefaultAdvice)
+    bool defaultAdvice)
     : moduleOp(moduleOp), AM(AM),
-      Opts(getAnalysisOptions(moduleOp)), GetDefaultAdvice(GetDefaultAdvice),
-    // : GetDefaultAdvice(GetDefaultAdvice),
+      Opts(getAnalysisOptions(moduleOp)), defaultAdvice(defaultAdvice),
       FeatureMap(getInitialFeatureMap()),
       CG(AM.getAnalysis<CallGraph>()),
       InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize),
@@ -553,7 +572,10 @@ llvm::FunctionPropertiesInfo &MLInlineAdvisor::getCachedFPI(FunctionOpInterface 
   return FPI;
 }
 
-std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface CB) {
+std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface CB) {
+    const Inliner::ResolvedCall &resolvedCall) {
+
+  CallOpInterface CB = resolvedCall.call;
   if (auto Skip = getSkipAdviceIfUnreachableCallsite(CB))
     return Skip;
 
@@ -561,7 +583,7 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface C
   FunctionOpInterface Caller = CB->getParentOfType<FunctionOpInterface>();
   Operation *calleeOp = call_interface_impl::resolveCallable(CB, &advisorSymbolTable);
   // FunctionOpInterface Callee = dyn_cast_or_null<FunctionOpInterface>(calleeOp);
-  FunctionOpInterface Callee = cast<FunctionOpInterface>(calleeOp);
+  FunctionOpInterface Callee = dyn_cast_or_null<FunctionOpInterface>(calleeOp);
 
   // if (Opts.ml_inliner_skip_policy == SkipMLPolicyCriteria::IfCallerIsNotCold) {
   //   if (!PSI.isFunctionEntryCold(&Caller)) {
@@ -691,8 +713,18 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(CallOpInterface C
   if (!Opts.inliner_interactive_channel_base.empty() &&
       Opts.inliner_interactive_include_default)
     *ModelRunner->getTensor<int64_t>(getFeatureMap().size() - 1) =
-        GetDefaultAdvice(CB);
+        defaultAdvice;
   return getAdviceFromModel(CB);
+}
+
+std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdvice(const Inliner::ResolvedCall &resolvedCall,
+                                                       bool MandatoryOnly) {
+  // if (!MandatoryOnly)
+    return getAdviceImpl(resolvedCall);
+  // bool Advice = CB.getCaller() != CB.getCalledFunction() &&
+                // MandatoryInliningKind::Always ==
+                    // getMandatoryKind(CB, FAM, getCallerORE(CB));
+  // return getMandatoryAdvice(CB, Advice);
 }
 
 /*HERE*/
@@ -788,7 +820,8 @@ MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
                                ? 0
                                : (Advisor->getLocalCalls(Caller) +
                                   Advisor->getLocalCalls(Callee))),
-      PreInlineCallerFPI(Advisor->getCachedFPI(Caller)) {
+      IsInliningRecommended(Recommendation),
+      PreInlineCallerFPI(Advisor->getCachedFPI(Caller)){
   // if (Recommendation)
     // FPU.emplace(Advisor->getCachedFPI(getCaller()), CB);
 }

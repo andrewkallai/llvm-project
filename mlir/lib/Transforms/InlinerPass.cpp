@@ -125,7 +125,47 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
   unsigned ratio = countOps(calleeRegion) * 100 / callerOps;
   LDBG() << "Callee / caller operation ratio (max: " << inliningThreshold
          << "%): " << ratio << "%";
-  // bool inlineDecision = (ratio <= inliningThreshold);
+
+  return ratio <= inliningThreshold;
+
+}
+
+static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
+                                 unsigned inliningThreshold,
+                                std::function<std::unique_ptr<MLInlineAdvisor>(bool)> advisorFunction) {
+  // bool defaultAdvice = false;
+
+  advisorFunction(false)->getAdvice(resolvedCall, false)->isInliningRecommended();
+  // Return early, ratio <= 0U will always be false.
+  if (inliningThreshold == 0U){
+    advisorFunction(false)->getAdvice(resolvedCall, false)->isInliningRecommended();
+  // return advisorFunction(false);
+    return false;
+  }
+  // Return early, ratio <= -1U will always be true.
+  if (inliningThreshold == -1U)
+    return true;
+
+  Region *callerRegion = resolvedCall.sourceNode->getCallableRegion();
+  Region *calleeRegion = resolvedCall.targetNode->getCallableRegion();
+
+  assert(calleeRegion && callerRegion && "unexpected external node");
+
+  auto countOps = [](Region *region) {
+    unsigned count = 0;
+    region->walk([&](Operation *) { ++count; });
+    return count;
+  };
+
+  unsigned callerOps = countOps(callerRegion);
+
+  // Always inline empty callees (if it is possible at all).
+  if (callerOps == 0)
+    return true;
+
+  unsigned ratio = countOps(calleeRegion) * 100 / callerOps;
+  LDBG() << "Callee / caller operation ratio (max: " << inliningThreshold
+         << "%): " << ratio << "%";
 
   
 
@@ -135,68 +175,6 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
 
 }
 
-// static bool isModel(const Inliner::ResolvedCall &resolvedCall,
-//                                  unsigned inliningThreshold) {
-//   // Return early, ratio <= 0U will always be false.
-//   if (inliningThreshold == 0U)
-//     return false;
-//   // Return early, ratio <= -1U will always be true.
-//   if (inliningThreshold == -1U)
-//     return true;
-
-//   Region *callerRegion = resolvedCall.sourceNode->getCallableRegion();
-//   Region *calleeRegion = resolvedCall.targetNode->getCallableRegion();
-
-//   assert(calleeRegion && callerRegion && "unexpected external node");
-
-//   auto countOps = [](Region *region) {
-//     unsigned count = 0;
-//     region->walk([&](Operation *) { ++count; });
-//     return count;
-//   };
-
-//   unsigned callerOps = countOps(callerRegion);
-
-//   // Always inline empty callees (if it is possible at all).
-//   if (callerOps == 0)
-//     return true;
-
-//     InlineParams Params;
-
-//     Params = {
-//     }
-//     //M = 
-//     auto &IAA = MAM.getResult<InlineAdvisorAnalysis>(M);
-//     // if (!IAA.tryCreate(Params, Mode,
-//     InlineParams IndirectCallParams = {/* DefaultThreshold*/ 0,
-//                                          /*HintThreshold*/ {},
-//                                          /*OptSizeHintThreshold*/ {},
-//                                          /*ColdThreshold*/ {},
-//                                          /*OptSizeThreshold*/ {},
-//                                          /*OptMinSizeThreshold*/ {},
-//                                          /*HotCallSiteThreshold*/ {},
-//                                          /*LocallyHotCallSiteThreshold*/ {},
-//                                          /*ColdCallSiteThreshold*/ {},
-//                                          /*ComputeFullInlineCost*/ true,
-//                                          /*EnableDeferral*/ true};
-
-//     if (!IAA.tryCreate(IndirectCallParams, InliningAdvisorMode::Development,
-//                       {},
-//                       InlineContext{LTOPhase, InlinePass::MLInliner})) {
-//     // M.getContext().emitError(
-//     //     "Could not setup Inlining Advisor for the requested "
-//     //     "mode and/or options");
-    
-//     false or true
-//   }
-//     /*
-//     HEEEEEE
-//     */
-//   unsigned ratio = countOps(calleeRegion) * 100 / callerOps;
-//   LDBG() << "Callee / caller operation ratio (max: " << inliningThreshold
-//          << "%): " << ratio << "%";
-//   return ratio <= inliningThreshold;
-// }
 
 void InlinerPass::runOnOperation() {
   CallGraph &cg = getAnalysis<CallGraph>();
@@ -211,14 +189,15 @@ void InlinerPass::runOnOperation() {
   }
 
   // By default, assume that any inlining is profitable.
-  auto profitabilityCb = [this](const Inliner::ResolvedCall &call) {
+  std::function<bool(const Inliner::ResolvedCall &)> profitabilityCb = [this](const Inliner::ResolvedCall &call) {
     return isProfitableToInline(call, inliningThreshold);
   };
 
 
   llvm::InliningAdvisorMode Mode = inliningAdvisorMode.getValue();
   switch (Mode) {
-  case llvm::InliningAdvisorMode::Default:
+  // case llvm::InliningAdvisorMode::Default:
+  case llvm::InliningAdvisorMode::Release:
     LDBG() << "Using default inliner heuristic.";
     break;
   case llvm::InliningAdvisorMode::Development:
@@ -228,16 +207,29 @@ void InlinerPass::runOnOperation() {
 #endif
     {
       MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
+      auto advisorFunction = analysis.getDevelopmentModeAdvisorFunction();
+      profitabilityCb = [this, advisorFunction](const Inliner::ResolvedCall &call) {
+        return isProfitableToInline(call, inliningThreshold, advisorFunction);
+      };
     }
     break;
-  case llvm::InliningAdvisorMode::Release:
+  // case llvm::InliningAdvisorMode::Release:
+  case llvm::InliningAdvisorMode::Default:
     LDBG() << "Using release-mode inliner policy.";
     // Advisor = llvm::getReleaseModeAdvisor(M, MAM, GetDefaultAdvice);
     {
       MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
+      auto advisorFunction = analysis.getReleaseModeAdvisorFunction();
+      profitabilityCb = [this, advisorFunction](const Inliner::ResolvedCall &call) {
+        return isProfitableToInline(call, inliningThreshold, advisorFunction);
+      };
     }
     break;
-  }
+  } 
+
+
+
+
   // Get an instance of the inliner.
   Inliner inliner(op, cg, *this, getAnalysisManager(), runPipelineHelper,
                   config, profitabilityCb);

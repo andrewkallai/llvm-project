@@ -24,6 +24,8 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Analysis/MLModelRunner.h"
+#include "mlir/Transforms/Inliner.h"
+
 
 
 
@@ -36,7 +38,7 @@
 namespace mlir {
 struct AnalysisOptions;
 class DiagnosticInfoOptimizationBase;
-// class Module;
+class MLInlineAdvisor;
 class MLInlineAdvice;
 class ProfileSummaryInfo;
 
@@ -54,8 +56,15 @@ public:
 
   bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM);
 
+  std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
+  getReleaseModeAdvisorFunction();
+
+  std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
+  getDevelopmentModeAdvisorFunction();
+
 private:
   ModuleOp moduleOp;
+  AnalysisManager &AM;
 };
 
 class MLInlineAdvisor {
@@ -65,7 +74,7 @@ public:
                   std::function<std::unique_ptr<MLModelRunner>(
                       const std::vector<llvm::TensorSpec> &)>
                       GetModelRunner,
-                  std::function<bool(CallOpInterface &)> GetDefaultAdvice);
+                  bool getDefaultAdvice);
 
   ~MLInlineAdvisor() = default;
   // ~MLInlineAdvisor() override = default;
@@ -93,14 +102,21 @@ public:
   
   std::unique_ptr<MLInlineAdvisor>
   getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
-                      std::function<bool(CallOpInterface &)> GetDefaultAdvice);
+                      bool defaultAdvice);
+
+  // std::unique_ptr<MLInlineAdvisor>
+  // getDevelopmentModeAdvisor(ModuleOp &moduleOp, ModuleAnalysisManager &AM,
+  //                         std::function<bool(CallOpInterface &)> GetDefaultAdvice);
+
+  std::unique_ptr<MLInlineAdvice> getAdvice(const Inliner::ResolvedCall &resolvedCall,
+                                          bool MandatoryOnly = false);
 
 
 protected:
   ModuleOp &moduleOp;
   AnalysisManager &AM;
   // std::unique_ptr<InlineAdvice> getAdviceImpl(CallBase &CB) override;
-  std::unique_ptr<MLInlineAdvice> getAdviceImpl(CallOpInterface CB);
+  std::unique_ptr<MLInlineAdvice> getAdviceImpl(const Inliner::ResolvedCall &resolvedCall);
 
   // std::unique_ptr<InlineAdvice> getMandatoryAdvice(CallBase &CB,
   std::unique_ptr<MLInlineAdvice> getMandatoryAdvice(CallOpInterface CB,
@@ -124,7 +140,7 @@ protected:
   const AnalysisOptions &Opts;
   std::unique_ptr<MLModelRunner> ModelRunner;
   // std::function<bool(CallBase &)> GetDefaultAdvice;
-  std::function<bool(CallOpInterface &)> GetDefaultAdvice;
+  bool defaultAdvice;
   std::vector<llvm::TensorSpec> FeatureMap;
 
 private:
@@ -198,6 +214,12 @@ public:
   const int64_t CalleeIRSize;
   const int64_t CallerAndCalleeEdges;
   void updateCachedCallerFPI(llvm::FunctionAnalysisManager &FAM) const;
+
+  bool isInliningRecommended() const { return IsInliningRecommended; }
+
+protected:
+  const bool IsInliningRecommended;
+
 
 private:
   void reportContextForRemark(DiagnosticInfoOptimizationBase &OR);
