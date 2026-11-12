@@ -135,11 +135,15 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
                                 std::function<std::unique_ptr<MLInlineAdvisor>(bool)> advisorFunction) {
   // bool defaultAdvice = false;
 
-  advisorFunction(false)->getAdvice(resolvedCall, false)->isInliningRecommended();
+  auto advisor = advisorFunction(false);
+  if (!advisor)
+    llvm_unreachable("Failed to create MLInlineAdvisor");
+
+  advisor->getAdvice(resolvedCall, false)->isInliningRecommended();
+
   // Return early, ratio <= 0U will always be false.
   if (inliningThreshold == 0U){
-    advisorFunction(false)->getAdvice(resolvedCall, false)->isInliningRecommended();
-  // return advisorFunction(false);
+    // advisorFunction(false)->getAdvice(resolvedCall, false)->isInliningRecommended();
     return false;
   }
   // Return early, ratio <= -1U will always be true.
@@ -196,8 +200,8 @@ void InlinerPass::runOnOperation() {
 
   llvm::InliningAdvisorMode Mode = inliningAdvisorMode.getValue();
   switch (Mode) {
-  // case llvm::InliningAdvisorMode::Default:
-  case llvm::InliningAdvisorMode::Release:
+  case llvm::InliningAdvisorMode::Default:
+  // case llvm::InliningAdvisorMode::Release:
     LDBG() << "Using default inliner heuristic.";
     break;
   case llvm::InliningAdvisorMode::Development:
@@ -213,8 +217,8 @@ void InlinerPass::runOnOperation() {
       };
     }
     break;
-  // case llvm::InliningAdvisorMode::Release:
-  case llvm::InliningAdvisorMode::Default:
+  case llvm::InliningAdvisorMode::Release:
+  // case llvm::InliningAdvisorMode::Default:
     LDBG() << "Using release-mode inliner policy.";
     // Advisor = llvm::getReleaseModeAdvisor(M, MAM, GetDefaultAdvice);
     {

@@ -43,6 +43,8 @@
 #include "mlir/Analysis/MLGOUtils.h"
 #include "mlir/Analysis/MLModelRunner.h"
 #include "mlir/Analysis/ReleaseModeModelRunner.h"
+#include "llvm/Support/DebugLog.h"
+
 
 
 
@@ -74,7 +76,7 @@ enum class EmitCModelChoice {
 
 static EmitCModelChoice getSelectedMLGOModel() {
   static llvm::cl::opt<EmitCModelChoice> SelectedMLGOModel(
-    "mlgo-model", llvm::cl::desc("Select the MLGO model to execute:"),
+    "mlir-mlgo-model", llvm::cl::desc("Select the MLGO model to execute:"),
     llvm::cl::init(EmitCModelChoice::Default),
     llvm::cl::values(clEnumValN(EmitCModelChoice::Default, "default",
                                 "Use standard heuristic")
@@ -195,53 +197,12 @@ MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
 // bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
 std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
 MLInlineAnalysis::getReleaseModeAdvisorFunction() {
-
-  // Initialize the MLInlineAdvisor with the provided operation and analysis manager.
-  // MLInlineAdvisor(moduleOp, AM);
-//   InliningAdvisorMode Mode;
-//   auto GetDefaultAdvice = [&AM, Params](CallBase &CB) {
-//     auto OIC = getDefaultInlineAdvice(CB, AM, Params);
-//     return OIC.has_value();
-//   };
-//   switch (Mode) {
-//   case InliningAdvisorMode::Default:
-//     LLVM_DEBUG(dbgs() << "Using default inliner heuristic.\n");
-//     Advisor.reset(new DefaultInlineAdvisor(M, FAM, Params, IC));
-//     // Restrict replay to default advisor, ML advisors are stateful so
-//     // replay will need augmentations to interleave with them correctly.
-//     if (!ReplaySettings.ReplayFile.empty()) {
-//       Advisor = llvm::getReplayInlineAdvisor(M, FAM, M.getContext(),
-//                                              std::move(Advisor), ReplaySettings,
-//                                              /* EmitRemarks =*/true, IC);
-//     }
-//     break;
-//     // Run IR2VecVocabAnalysis once per module to get the vocabulary.
-//     // We run it here because it is immutable and we want to avoid running it
-//     // multiple times.
-//   case InliningAdvisorMode::Development:
-// #ifdef LLVM_HAVE_TFLITE
-//     LLVM_DEBUG(dbgs() << "Using development-mode inliner policy.\n");
-//     if (!InlineAdvisorAnalysis::initializeIR2VecVocabIfRequested(M, MAM))
-//       return false;
-//     Advisor = llvm::getDevelopmentModeAdvisor(M, MAM, GetDefaultAdvice);
-// #endif
-//     break;
-//   case InliningAdvisorMode::Release:
-//     LLVM_DEBUG(dbgs() << "Using release-mode inliner policy.\n");
-//     if (!InlineAdvisorAnalysis::initializeIR2VecVocabIfRequested(M, MAM))
-//       return false;
-//     Advisor = llvm::getReleaseModeAdvisor(M, MAM, GetDefaultAdvice);
-//     break;
-//   }
-
-//   return !!Advisor;
-    // return MLInlineAdvisor(moduleOp, AM, defaultAdvice);
-  // std::unique_ptr<MLInlineAdvisor>
-  // getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
-                      // std::function<bool(CallOpInterface &)> GetDefaultAdvice);
-
   auto releaseModeAdvisorFunc = [this](bool defaultAdvice) {
-           return getReleaseModeAdvisor(moduleOp, AM, defaultAdvice);
+            auto advisor = getReleaseModeAdvisor(moduleOp, AM, defaultAdvice);
+            // if (!advisor){
+            //       llvm_unreachable("getReleaseModeAdvisor returned nullpr");
+            // }
+            return advisor;
   }; 
   return releaseModeAdvisorFunc;
 }
