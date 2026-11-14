@@ -10,7 +10,7 @@
 #include "mlir/Analysis/EmitCModelRunner.h"
 #include "mlir/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Analysis/TensorSpec.h"
-#include "llvm/IR/LLVMContext.h"
+// #include "llvm/IR/LLVMContext.h"
 #include "gtest/gtest.h"
 #include <map>
 #include <string>
@@ -101,8 +101,8 @@ TEST(MLGOUtilsTest, IsReleaseModelValid) {
       (isReleaseModelValid<MockAOTModel>("", TestModelChoice::Default)));
 
   // Overload with cl::opt<EnumType>:
-  cl::opt<TestModelChoice> OptChoice("test-mlgo-utils-choice",
-                                     cl::init(TestModelChoice::Default));
+  llvm::cl::opt<TestModelChoice> OptChoice("test-mlgo-utils-choice",
+                                     llvm::cl::init(TestModelChoice::Default));
   EXPECT_FALSE((isReleaseModelValid<NoopSavedModelImpl>("", OptChoice)));
   OptChoice = TestModelChoice::Model1;
   EXPECT_TRUE((isReleaseModelValid<NoopSavedModelImpl>("", OptChoice)));
@@ -112,14 +112,14 @@ TEST(MLGOUtilsTest, IsReleaseModelValid) {
 }
 
 TEST(MLGOUtilsTest, CreateReleaseModeModelRunnerModelSelection) {
-  LLVMContext Ctx;
-  std::vector<TensorSpec> Inputs{TensorSpec::createSpec<int64_t>("a", {1}),
-                                 TensorSpec::createSpec<int64_t>("b", {1})};
-  TensorSpec OutputSpec = TensorSpec::createSpec<int64_t>("result", {1});
+  MLIRContext Ctx;
+  std::vector<llvm::TensorSpec> Inputs{llvm::TensorSpec::createSpec<int64_t>("a", {1}),
+                                 llvm::TensorSpec::createSpec<int64_t>("b", {1})};
+  llvm::TensorSpec OutputSpec = llvm::TensorSpec::createSpec<int64_t>("result", {1});
 
   auto CreateRunnerForChoice =
       [&](TestModelChoice Choice) -> std::unique_ptr<MLModelRunner> {
-    auto Factory = [&](LLVMContext &C, const std::vector<TensorSpec> &Specs)
+    auto Factory = [&](MLIRContext &C, const std::vector<llvm::TensorSpec> &Specs)
         -> std::unique_ptr<MLModelRunner> {
       switch (Choice) {
       case TestModelChoice::Default:
@@ -156,12 +156,12 @@ TEST(MLGOUtilsTest, CreateReleaseModeModelRunnerModelSelection) {
 }
 
 TEST(MLGOUtilsTest, CreateReleaseModeModelRunnerAOTFallback) {
-  LLVMContext Ctx;
-  std::vector<TensorSpec> Inputs{TensorSpec::createSpec<int64_t>("a", {1}),
-                                 TensorSpec::createSpec<int64_t>("b", {1})};
-  TensorSpec OutputSpec = TensorSpec::createSpec<int64_t>("result", {1});
+  MLIRContext Ctx;
+  std::vector<llvm::TensorSpec> Inputs{llvm::TensorSpec::createSpec<int64_t>("a", {1}),
+                                 llvm::TensorSpec::createSpec<int64_t>("b", {1})};
+  llvm::TensorSpec OutputSpec = llvm::TensorSpec::createSpec<int64_t>("result", {1});
 
-  auto DummyEmitCFactory = [](LLVMContext &, const std::vector<TensorSpec> &)
+  auto DummyEmitCFactory = [](MLIRContext &, const std::vector<llvm::TensorSpec> &)
       -> std::unique_ptr<MLModelRunner> { return nullptr; };
 
   auto Runner = createReleaseModeModelRunner<MockAOTModel>(

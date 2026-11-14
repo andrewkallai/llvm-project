@@ -21,6 +21,11 @@
 #include "llvm/Analysis/TensorSpec.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Location.h"
+
+
+
 
 #include <memory>
 
