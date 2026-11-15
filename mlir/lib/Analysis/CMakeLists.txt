@@ -73,6 +73,7 @@ add_mlir_library(MLIRAnalysisBase
   DataLayoutAnalysis.cpp
   InteractiveModelRunner.cpp
   Liveness.cpp
+  NoInferenceModelRunner.cpp
   SliceAnalysis.cpp
   SliceWalk.cpp
   TopologicalSortUtils.cpp

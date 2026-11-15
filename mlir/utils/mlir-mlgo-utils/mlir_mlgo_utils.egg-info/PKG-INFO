@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: mlgo-utils
+Version: 24.0.0.dev202610051517
+Summary: Tooling for ML in LLVM
+License-Expression: Apache-2.0 WITH LLVM-exception
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+# MLGO Python Utilities
+
+This folder contains MLGO Python utilities, particularly infrastructure
+to help enable ML applications within LLVM, especially tooling to extract
+corpora that can be used in downstream projects to train ML models and perform
+other tasks that benefit from having a large amount of data.

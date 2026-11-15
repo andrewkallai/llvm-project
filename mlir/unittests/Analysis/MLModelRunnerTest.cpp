@@ -39,10 +39,11 @@ using namespace mlir;
 
 namespace mlir {
   struct CountingDiagnosticHandler {
-  unsigned count = 0;
+  unsigned numErrors = 0;
 
   mlir::LogicalResult operator()(mlir::Diagnostic &diag) {
-    ++count;
+    if (diag.getSeverity() == mlir::DiagnosticSeverity::Error)
+      ++numErrors;
     return mlir::success();
   }
 };
@@ -178,7 +179,7 @@ static EmbeddedModelRunnerOptions makeOptions() {
   Opts.setFeedPrefix("prefix_");
   return Opts;
 }
-} // namespace llvm
+} // namespace mlir
 
 TEST(NoInferenceModelRunner, AccessTensors) {
   const std::vector<llvm::TensorSpec> Inputs{
@@ -274,14 +275,14 @@ struct AbortOnErrorDiagnosticHandler : public llvm::DiagnosticHandler {
 // buffer. One error is reported for the whole runner, not one per tensor.
 TEST(ReleaseModeRunner, ShapeMismatch) {
   MLIRContext Ctx;
-  // auto Handler = std::make_unique<CountingDiagnosticHandler>();
-  // auto *HandlerPtr = Handler.get();
+  auto Handler = std::make_unique<CountingDiagnosticHandler>();
+  auto *HandlerPtr = Handler.get();
   // Ctx.setDiagnosticHandler(std::move(Handler));
-  CountingDiagnosticHandler Handler;
+  // CountingDiagnosticHandler Handler;
 
   ScopedDiagnosticHandler scopedHandler(
     &Ctx, [&Handler](mlir::Diagnostic &diag) {
-      return Handler(diag);
+      return Handler->operator()(diag);
     });
   // ScopedDiagnosticHandler scopedHandler(
     // &Ctx, std::move(Handler));
@@ -290,7 +291,7 @@ TEST(ReleaseModeRunner, ShapeMismatch) {
   ReleaseModeModelRunner<AdditionAOTModel> Evaluator(Ctx, Inputs, "",
                                                      makeOptions());
   EXPECT_FALSE(Evaluator.isValid());
-  EXPECT_EQ(HandlerPtr->NumErrors, 1u);
+  EXPECT_EQ(HandlerPtr->numErrors, 1u);
   // The scratch buffers are sized after the requested specs.
   for (int64_t I = 0; I < 4; ++I)
     Evaluator.getTensor<int64_t>(0)[I] = I;

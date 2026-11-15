@@ -290,6 +290,10 @@ endif()
 # Generally things after this point may depend on MLIR_ALL_LIBS or libMLIR.so.
 add_subdirectory(tools)
 
+if (MLIR_INCLUDE_TESTS)
+  add_subdirectory(utils/mlir-mlgo-utils)
+endif()
+
 if(MLIR_ENABLE_BINDINGS_PYTHON)
   # Python sources: built extensions come in via lib/Bindings/Python
   add_subdirectory(python)
