@@ -141,6 +141,33 @@ def test_command_extraction():
     # CHECK-COMMAND-EXTRACT: /foo/bar/lib/obj_file.o
     # CHECK-COMMAND-EXTRACT: /dev/null
 
+def test_cir_extraction(input_dir, output_dir):
+    obj = extract_ir_lib.TrainingIRExtractor(
+        obj_relative_path="for.o",
+        output_base_dir=output_dir,
+        obj_base_dir=input_dir,
+    )
+
+    # Save the original input contents.
+    with open(obj.input_obj(), "rb") as f:
+        original_contents = f.read()
+
+    # Perform the CIR extraction (rename).
+    obj._invoke_extraction_cir_command()
+
+    # Verify that the original input no longer exists.
+    print(os.path.exists(obj.input_obj()))
+    # CHECK-CIR-EXTRACT: False
+
+    # Verify that the CIR output exists.
+    print(os.path.exists(obj.cir_file()))
+    # CHECK-CIR-EXTRACT-NEXT: True
+
+    # Verify that the contents were preserved.
+    with open(obj.cir_file(), "rb") as f:
+        print(f.read() == original_contents)
+    # CHECK-CIR-EXTRACT-NEXT: True
+
 
 ## Test that we generate the correct extraction commands without specifying
 ## an output base directory.

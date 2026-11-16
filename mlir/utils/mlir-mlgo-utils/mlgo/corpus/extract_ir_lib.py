@@ -16,6 +16,7 @@ import multiprocessing
 import functools
 import json
 import logging
+from pdb import set_trace
 
 _UNSPECIFIED_OVERRIDE = ["<UNSPECIFIED>"]
 
@@ -134,7 +135,7 @@ class TrainingIRExtractor:
         when invoked, will extract the bitcode section into the self.bc_file()
         file.
         """
-        os.rename(self.input_ob(), self.cir_file())
+        os.rename(self.input_obj(), self.cir_file())
         return
 
     def _get_extraction_mlir_command(
@@ -164,9 +165,11 @@ class TrainingIRExtractor:
             logging.info("%s does not exist.", self.input_obj())
             return None
         os.makedirs(self.dest_dir(), exist_ok=True)
+        print('8'*50)
+        print(llvm_objcopy_path)
         if os.path.basename(llvm_objcopy_path) == "cir-opt":
             try:
-                _invoke_extraction_cir_command()
+                self._invoke_extraction_cir_command()
                 subprocess.check_output(
                     self._get_extraction_mlir_command(llvm_objcopy_path),
                     stderr=subprocess.STDOUT,
@@ -245,6 +248,7 @@ class TrainingIRExtractor:
         cmd_section_name: str | None = ".llvmcmd",
         bitcode_section_name: str | None = ".llvmbc",
     ) -> str | None:
+        print('y'*50)
         if thinlto_build == "local":
             return self._extract_lld_artifacts()
         return self._extract_clang_artifacts(
@@ -412,6 +416,7 @@ def run_extraction(
       bitcode_section_name: The name of the bitcode section created by the
         bitcode embedding.
     """
+    # set_trace()
     extract_artifacts = functools.partial(
         TrainingIRExtractor.extract,
         llvm_objcopy_path=llvm_objcopy_path,

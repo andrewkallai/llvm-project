@@ -17,3 +17,7 @@ version = {attr = "mlgo.__version__"}
 combine_training_corpus = "mlgo.corpus.combine_training_corpus:parse_args_and_run"
 extract_ir = "mlgo.corpus.extract_ir:parse_args_and_run"
 make_corpus = "mlgo.corpus.make_corpus:parse_args_and_run"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mlgo"]
