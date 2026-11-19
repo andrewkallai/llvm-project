@@ -66,6 +66,14 @@ def parse_args_and_run():
         nargs="?",
     )
     parser.add_argument(
+        "--cir_opt_path",
+        type=str,
+        help="Path to cir-opt",
+        default="",
+        nargs="?",
+    )
+    
+    parser.add_argument(
         "--obj_base_dir",
         type=str,
         help="Base directory for object files. Defaults to current working dir.",
@@ -164,6 +172,7 @@ def main(args):
         objs,
         args.num_workers,
         args.llvm_objcopy_path,
+        args.cir_opt_path,
         args.cmd_filter,
         args.thinlto_build,
         args.cmd_section_name,

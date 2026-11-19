@@ -139,22 +139,23 @@ class TrainingIRExtractor:
         return
 
     def _get_extraction_mlir_command(
-        self, llvm_objcopy_path: str
+        self, cir_opt_path: str
     ):
         """Gets llvm-objcopy and process args to produce a command string that,
         when invoked, will extract the bitcode section into the self.bc_file()
         file.
         """
         return [
-                llvm_objcopy_path,
+                cir_opt_path,
                 "-cir-to-llvm", "-o", self.mlir_file(),
-                self.input_obj()
+                self.cir_file()
         ]
 
 
     def _extract_clang_artifacts(
         self,
         llvm_objcopy_path: str,
+        cir_opt_path: str,
         cmd_filter: str | None,
         is_thinlto: bool,
         cmd_section_name: str,
@@ -166,12 +167,15 @@ class TrainingIRExtractor:
             return None
         os.makedirs(self.dest_dir(), exist_ok=True)
         print('8'*50)
-        print(llvm_objcopy_path)
-        if os.path.basename(llvm_objcopy_path) == "cir-opt":
+        print(cir_opt_path)
+        if cir_opt_path != "":
             try:
                 self._invoke_extraction_cir_command()
+                cmd = self._get_extraction_mlir_command(cir_opt_path)
+                print("Executing:", cmd)
                 subprocess.check_output(
-                    self._get_extraction_mlir_command(llvm_objcopy_path),
+                    # self._get_extraction_mlir_command(cir_opt_path),
+                    cmd,
                     stderr=subprocess.STDOUT,
                     encoding="utf-8",
                 )
@@ -215,11 +219,18 @@ class TrainingIRExtractor:
                 logging.warning("%s was not processed: %s", self.input_obj(), e)
                 logging.info(e.output)
                 return None
-        assert (
-            os.path.exists(self.cmd_file())
-            and os.path.exists(self.bc_file())
-            and (not is_thinlto or os.path.exists(self.thinlto_index_file()))
-        )
+        if os.path.basename(cir_opt_path) != "":
+            assert (
+                os.path.exists(self.cir_file())
+                and os.path.exists(self.mlir_file())
+                and (not is_thinlto or os.path.exists(self.thinlto_index_file()))
+            )
+        else:
+            assert (
+                os.path.exists(self.cmd_file())
+                and os.path.exists(self.bc_file())
+                and (not is_thinlto or os.path.exists(self.thinlto_index_file()))
+            )
         return self.relative_output_path()
 
     def _extract_lld_artifacts(self) -> str | None:
@@ -243,16 +254,17 @@ class TrainingIRExtractor:
     def extract(
         self,
         llvm_objcopy_path: str | None = None,
+        cir_opt_path: str | None = None,
         cmd_filter: str | None = None,
         thinlto_build: str | None = None,
         cmd_section_name: str | None = ".llvmcmd",
         bitcode_section_name: str | None = ".llvmbc",
     ) -> str | None:
-        print('y'*50)
         if thinlto_build == "local":
             return self._extract_lld_artifacts()
         return self._extract_clang_artifacts(
             llvm_objcopy_path=llvm_objcopy_path,
+            cir_opt_path=cir_opt_path,
             cmd_filter=cmd_filter,
             is_thinlto=thinlto_build == "distributed",
             cmd_section_name=cmd_section_name,
@@ -393,6 +405,7 @@ def run_extraction(
     objs: list[TrainingIRExtractor],
     num_workers: int,
     llvm_objcopy_path: str,
+    cir_opt_path: str,
     cmd_filter: str | None,
     thinlto_build: str,
     cmd_section_name: str,
@@ -420,6 +433,7 @@ def run_extraction(
     extract_artifacts = functools.partial(
         TrainingIRExtractor.extract,
         llvm_objcopy_path=llvm_objcopy_path,
+        cir_opt_path=cir_opt_path,
         cmd_filter=cmd_filter,
         thinlto_build=thinlto_build,
         cmd_section_name=cmd_section_name,
