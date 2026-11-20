@@ -350,6 +350,9 @@ def InlinerPass : Pass<"inline"> {
                  clEnumValN(llvm::InliningAdvisorMode::Release, "release",
                             "Use release mode (AOT-compiled model)"))
            }]>,
+    Option<"printInlineAdvisor", "print-inline-advisor", "bool",
+       /*default=*/"false",
+       "Print ML inline advisor information after inlining">,
   ];
 }
 

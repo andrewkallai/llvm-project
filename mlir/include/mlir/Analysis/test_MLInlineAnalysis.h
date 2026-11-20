@@ -111,6 +111,8 @@ public:
   std::unique_ptr<MLInlineAdvice> getAdvice(const Inliner::ResolvedCall &resolvedCall,
                                           bool MandatoryOnly = false);
 
+  void print(raw_ostream &OS) const;
+
 
 protected:
   ModuleOp &moduleOp;
@@ -143,13 +145,12 @@ protected:
   bool defaultAdvice;
   std::vector<llvm::TensorSpec> FeatureMap;
 
+
 private:
   int64_t getModuleIRSize() const;
   std::unique_ptr<MLInlineAdvice>
   getSkipAdviceIfUnreachableCallsite(CallOpInterface CB);
   // getSkipAdviceIfUnreachableCallsite(CallBase &CB);
-  void print(raw_ostream &OS) const;
-  // void print(raw_ostream &OS) const override;
 
   // Using std::map to benefit from its iterator / reference non-invalidating
   // semantics, which make it easy to use `getCachedFPI` results from multiple

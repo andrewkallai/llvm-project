@@ -132,7 +132,8 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
 
 static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
                                  unsigned inliningThreshold,
-                                std::function<std::unique_ptr<MLInlineAdvisor>(bool)> advisorFunction) {
+                                std::function<std::unique_ptr<MLInlineAdvisor>(bool)> advisorFunction,
+                                 bool printInlineAdvisor) {
   // bool defaultAdvice = false;
 
   auto advisor = advisorFunction(false);
@@ -171,7 +172,9 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
   LDBG() << "Callee / caller operation ratio (max: " << inliningThreshold
          << "%): " << ratio << "%";
 
-  
+  if (printInlineAdvisor) {
+    advisor->print(llvm::errs());
+  }
 
 
 
@@ -213,7 +216,7 @@ void InlinerPass::runOnOperation() {
       MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
       auto advisorFunction = analysis.getDevelopmentModeAdvisorFunction();
       profitabilityCb = [this, advisorFunction](const Inliner::ResolvedCall &call) {
-        return isProfitableToInline(call, inliningThreshold, advisorFunction);
+        return isProfitableToInline(call, inliningThreshold, advisorFunction, printInlineAdvisor);
       };
     }
     break;
@@ -225,7 +228,7 @@ void InlinerPass::runOnOperation() {
       MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
       auto advisorFunction = analysis.getReleaseModeAdvisorFunction();
       profitabilityCb = [this, advisorFunction](const Inliner::ResolvedCall &call) {
-        return isProfitableToInline(call, inliningThreshold, advisorFunction);
+        return isProfitableToInline(call, inliningThreshold, advisorFunction, printInlineAdvisor);
       };
     }
     break;
