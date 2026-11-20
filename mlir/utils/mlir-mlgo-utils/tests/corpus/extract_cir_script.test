@@ -1,0 +1,36 @@
+# REQUIRES: system-linux
+
+## Test that invoking the extract_ir script work as expected.
+
+# RUN: rm -rf %t.dir && mkdir %t.dir
+
+# RUN: split-file %s %t.dir
+
+# RUN: %python %scripts_dir/corpus/extract_ir.py --input=%t.dir --input_type=directory --output_dir=%t.dir.out --cir_opt_path=cir-opt
+# RUN: cat %t.dir.out/corpus_description.json | FileCheck %s
+
+## Check that this is not a thinLTO build
+# CHECK: "has_thinlto": false
+## Check that the expected modules end up in the corpus description
+# CHECK-DAG: "for.o"
+
+
+
+
+# RUN: ls %t.dir.out | FileCheck %s --check-prefix CHECK-DIR
+
+
+# CHECK-DIR: for.o.cir
+# CHECK-DIR: for.o.mlir
+
+//--- for.o
+cir.func @for_loop(%cond : !cir.bool) {
+  cir.for : cond {
+    cir.condition(%cond)
+  } body {
+    cir.yield
+  } step {
+    cir.yield
+  }
+  cir.return
+}

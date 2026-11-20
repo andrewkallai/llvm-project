@@ -3,6 +3,7 @@
 ## Test the functionality of extract_ir_lib
 
 import sys
+import os
 
 from mlgo.corpus import extract_ir_lib
 
@@ -141,7 +142,28 @@ def test_command_extraction():
     # CHECK-COMMAND-EXTRACT: /foo/bar/lib/obj_file.o
     # CHECK-COMMAND-EXTRACT: /dev/null
 
+## Test that we generate the correct objcopy commands for extracting commands
+
+# RUN: %python %s test_cir_extraction %t.dir %t.dir.out | FileCheck %s --check-prefix CHECK-CIR-EXTRACT
+
 def test_cir_extraction(input_dir, output_dir):
+    CIR_MODULE = b"""\
+    cir.func @for_loop(%cond : !cir.bool) {
+    cir.for : cond {
+        cir.condition(%cond)
+    } body {
+        cir.yield
+    } step {
+        cir.yield
+    }
+    cir.return
+    }
+    """
+
+    # Create the input CIR file.
+    with open(os.path.join(input_dir, "for.o"), "wb") as f:
+        f.write(CIR_MODULE)
+
     obj = extract_ir_lib.TrainingIRExtractor(
         obj_relative_path="for.o",
         output_base_dir=output_dir,
@@ -159,6 +181,8 @@ def test_cir_extraction(input_dir, output_dir):
     print(os.path.exists(obj.input_obj()))
     # CHECK-CIR-EXTRACT: False
 
+
+
     # Verify that the CIR output exists.
     print(os.path.exists(obj.cir_file()))
     # CHECK-CIR-EXTRACT-NEXT: True
@@ -167,6 +191,31 @@ def test_cir_extraction(input_dir, output_dir):
     with open(obj.cir_file(), "rb") as f:
         print(f.read() == original_contents)
     # CHECK-CIR-EXTRACT-NEXT: True
+
+## Test that we generate the correct objcopy commands for extracting commands
+
+# RUN: %python %s test_mlir_extraction | FileCheck %s --check-prefix CHECK-MLIR-EXTRACT
+
+def test_mlir_extraction():
+    obj = extract_ir_lib.TrainingIRExtractor(
+        obj_relative_path="lib/obj_file.o",
+        output_base_dir="/where/corpus/goes",
+        obj_base_dir="/foo/bar",
+    )
+
+
+    extraction_cmd = obj._get_extraction_mlir_command(
+        "/bin/cir_opt_path"
+    )
+    for part in extraction_cmd:
+        print(part)
+
+    # CHECK-MLIR-EXTRACT: /bin/cir_opt_path
+    # CHECK-MLIR-EXTRACT: -cir-to-llvm
+    # CHECK-MLIR-EXTRACT: -o
+    # CHECK-MLIR-EXTRACT: /where/corpus/goes/lib/obj_file.o.mlir
+    # CHECK-MLIR-EXTRACT: /where/corpus/goes/lib/obj_file.o.cir
+
 
 
 ## Test that we generate the correct extraction commands without specifying

@@ -7,8 +7,6 @@
 # RUN: yaml2obj %s -o %t.dir/test2.o
 # RUN: rm -rf %t.dir.out && mkdir %t.dir.out
 
-
-
 # RUN: %python %scripts_dir/corpus/extract_ir.py --input=%t.dir --input_type=directory --output_dir=%t.dir.out --llvm_objcopy_path=llvm-objcopy
 # RUN: cat %t.dir.out/corpus_description.json | FileCheck %s
 
@@ -18,27 +16,13 @@
 # CHECK-DAG: "test1.o"
 # CHECK-DAG: "test2.o"
 
-
-
-
 # RUN: ls %t.dir.out | FileCheck %s --check-prefix CHECK-DIR
-
 
 # CHECK-DIR: test1.o.bc
 # CHECK-DIR: test1.o.cmd
 # CHECK-DIR: test2.o.bc
 # CHECK-DIR: test2.o.cmd
 
-# RUN: cat %t.dir.out/corpus_description.json | FileCheck %s
-# RUN: rm -rf %t.dir && mkdir %t.dir
-# RUN: rm -rf %t.dir.out && mkdir %t.dir.out
-# RUN: cp %S/../../../../../clang/test/CIR/IR/for.cir %t.dir/for.o
-# RUN: %python %scripts_dir/corpus/extract_ir.py --input=%t.dir --input_type=directory --output_dir=%t.dir.out --cir_opt_path=cir-opt
-# RUN: cat %t.dir.out/corpus_description.json | FileCheck %s
-# CHECK-DAG: "for.o"
-# RUN: cmp %t.dir/for.o %t.dir.out/for.o.cir
-# RUN: ls %t.dir.out | FileCheck %s --check-prefix CHECK-DIR
-# CHECK-DIR: for.o.cir
 --- !ELF
 FileHeader:
   Class:           ELFCLASS64
