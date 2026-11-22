@@ -412,3 +412,6 @@ if config.mlir_expensive_pattern_api_checks:
 
 if sys.version_info >= (3, 11):
     config.available_features.add("python-ge-311")
+
+if config.have_tflite:
+    config.available_features.add("have_tflite")

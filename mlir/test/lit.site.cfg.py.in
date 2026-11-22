@@ -32,7 +32,9 @@ config.mlir_tools_dir = path(r"@MLIR_TOOLS_DIR@")
 config.mlir_cmake_dir = path(r"@MLIR_CMAKE_DIR@")
 config.mlir_lib_dir = path(r"@MLIR_LIB_DIR@")
 
+
 config.build_examples = @LLVM_BUILD_EXAMPLES@
+config.have_tflite = "@LLVM_HAVE_TFLITE@"
 config.run_nvptx_tests = @LLVM_HAS_NVPTX_TARGET@
 config.enable_cuda_runner = @MLIR_ENABLE_CUDA_RUNNER@
 config.run_rocm_tests = @LLVM_HAS_AMDGPU_TARGET@
