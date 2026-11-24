@@ -353,6 +353,19 @@ def InlinerPass : Pass<"inline"> {
     Option<"printInlineAdvisor", "print-inline-advisor", "bool",
        /*default=*/"false",
        "Print ML inline advisor information after inlining">,
+    Option<"mlirMlgoModel", "mlir-mlgo-model", "mlir::EmitCModelChoice",
+       "mlir::EmitCModelChoice::Default",
+       "Select the MLGO model to execute",
+       [{
+         llvm::cl::values(
+             clEnumValN(mlir::EmitCModelChoice::Default, "default",
+                        "Use standard heuristic")
+#define MLGO_MODEL(CLASS_NAME, CLI_FLAG) \
+             , clEnumValN(mlir::EmitCModelChoice::CLASS_NAME, CLI_FLAG, \
+                          "Use the " CLI_FLAG " MLGO model")
+#include "llvm/Analysis/InlinerModels.def"
+         )
+       }]>,
   ];
 }
 

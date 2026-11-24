@@ -44,6 +44,7 @@
 #include "mlir/Analysis/MLModelRunner.h"
 #include "mlir/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/ManagedStatic.h"
 
 
 
@@ -67,27 +68,50 @@ using CompiledModelType = NoopSavedModelImpl;
 // #include "mlir/Analysis/InlinerModels.h"
 #include "llvm/Analysis/InlinerModels.h"
 
-enum class EmitCModelChoice {
-  Default,
-#define MLGO_MODEL(CLASS_NAME, CLI_FLAG) CLASS_NAME,
-// #include "mlir/Analysis/InlinerModels.def"
-#include "llvm/Analysis/InlinerModels.def"
-};
+// enum class EmitCModelChoice {
+//   Default,
+// #define MLGO_MODEL(CLASS_NAME, CLI_FLAG) CLASS_NAME,
+// // #include "mlir/Analysis/InlinerModels.def"
+// #include "llvm/Analysis/InlinerModels.def"
+// };
 
-static EmitCModelChoice getSelectedMLGOModel() {
-  static llvm::cl::opt<EmitCModelChoice> SelectedMLGOModel(
-    "mlir-mlgo-model", llvm::cl::desc("Select the MLGO model to execute:"),
-    llvm::cl::init(EmitCModelChoice::Default),
-    llvm::cl::values(clEnumValN(EmitCModelChoice::Default, "default",
-                                "Use standard heuristic")
-#define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
-  , clEnumValN(EmitCModelChoice::CLASS_NAME, CLI_FLAG,                         \
-               "Use the " CLI_FLAG " MLGO model")
-// #include "mlir/Analysis/InlinerModels.def"
-#include "llvm/Analysis/InlinerModels.def"
-                         ));
-  return SelectedMLGOModel;
+static EmitCModelChoice SelectedMLGOModel =
+    EmitCModelChoice::Default;
+
+void setSelectedMLGOModel(EmitCModelChoice model) {
+  SelectedMLGOModel = model;
 }
+// static EmitCModelChoice getSelectedMLGOModel() {
+// struct MLInlineAdvisorOptions {
+// llvm::cl::opt<EmitCModelChoice> SelectedMLGOModel{
+//     "mlir-mlgo-model", llvm::cl::desc("Select the MLGO model to execute:"),
+//     llvm::cl::init(EmitCModelChoice::Default),
+//     llvm::cl::values(clEnumValN(EmitCModelChoice::Default, "default",
+//                                 "Use standard heuristic")
+// #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
+//   , clEnumValN(EmitCModelChoice::CLASS_NAME, CLI_FLAG,                         \
+//                "Use the " CLI_FLAG " MLGO model")
+// // #include "mlir/Analysis/InlinerModels.def"
+// #include "llvm/Analysis/InlinerModels.def"
+//                          )};
+// };
+  // return SelectedMLGOModel;
+// }
+
+
+// llvm::ManagedStatic<MLInlineAdvisorOptions> AdvisorOptions;
+
+// void mlir::registerMLInlineAdvisorCLOptions() {
+  // (void)*AdvisorOptions;
+// }
+
+// void registerMLInlineAdvisorCLOptions() {
+//   *AdvisorOptions;
+// }
+
+// AdvisorOptions->SelectedMLGOModel.getValue()
+
+
 
 // static std::unique_ptr<llvm::MLModelRunner> getCreateEmitCModelRunner() {
   // static std::unique_ptr<llvm::MLModelRunner>
@@ -95,7 +119,8 @@ static EmitCModelChoice getSelectedMLGOModel() {
   // createEmitCModelRunner(LLVMContext &Ctx,
   createEmitCModelRunner(MLIRContext &Ctx,
                         const std::vector<llvm::TensorSpec> &InputFeatures) {
-    switch (getSelectedMLGOModel()) {
+    // switch (getSelectedMLGOModel()) {
+    switch (SelectedMLGOModel) {
     case EmitCModelChoice::Default:
       return nullptr;
   #define MLGO_MODEL(CLASS_NAME, CLI_FLAG)                                       \
@@ -112,16 +137,17 @@ static EmitCModelChoice getSelectedMLGOModel() {
 // }
 
 std::unique_ptr<MLInlineAdvisor>
-getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
+getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
                             bool defaultAdvice) {
-  const AnalysisOptions &Opts = getAnalysisOptions(moduleOp);
+  const AnalysisOptions &Opts = getAnalysisOptions(*moduleOp);
   if (!isReleaseModelValid<CompiledModelType>(
-          Opts.inliner_interactive_channel_base, getSelectedMLGOModel()))
+          // Opts.inliner_interactive_channel_base, getSelectedMLGOModel()))
+          Opts.inliner_interactive_channel_base, SelectedMLGOModel))
     return nullptr;
   auto RunnerFactory = [&](const std::vector<llvm::TensorSpec> &InputFeatures)
       -> std::unique_ptr<MLModelRunner> {
     return createReleaseModeModelRunner<CompiledModelType>(
-        *moduleOp.getContext(), InputFeatures, llvm::DecisionName,
+        *moduleOp->getContext(), InputFeatures, llvm::DecisionName,
         Opts.inliner_interactive_channel_base.str(), llvm::InlineDecisionSpec,
         createEmitCModelRunner,
         EmbeddedModelRunnerOptions().setModelSelector(
@@ -165,6 +191,7 @@ const llvm::TensorSpec &getDefaultDecisionSpec() {
 }
 const char *const RewardName = "delta_size";
 
+
 CallOpInterface getInlinableCS(CallOpInterface callOp, 
                                       SymbolTableCollection &symbolTable) {
   // 1. Resolve the callee. 
@@ -191,24 +218,27 @@ CallOpInterface getInlinableCS(CallOpInterface callOp,
 // };
 
 MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
-    : moduleOp(cast<ModuleOp>(op)), AM(AM) {
+    : moduleOp(op), AM(AM) {
 }
 
 // bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
 std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-MLInlineAnalysis::getReleaseModeAdvisorFunction() {
+MLInlineAnalysis::getReleaseModeAdvisorFunction(EmitCModelChoice model) {
+  setSelectedMLGOModel(model); 
   auto releaseModeAdvisorFunc = [this](bool defaultAdvice) {
             auto advisor = getReleaseModeAdvisor(moduleOp, AM, defaultAdvice);
-            // if (!advisor){
-            //       llvm_unreachable("getReleaseModeAdvisor returned nullpr");
-            // }
+            if (!advisor){
+                  llvm_unreachable("getReleaseModeAdvisor returned nullpr");
+            }
             return advisor;
   }; 
   return releaseModeAdvisorFunc;
+  // return getReleaseModeAdvisor(moduleOp, AM, defaultAdvice)
 }
 
 std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-MLInlineAnalysis::getDevelopmentModeAdvisorFunction() {
+MLInlineAnalysis::getDevelopmentModeAdvisorFunction(EmitCModelChoice model) {
+  setSelectedMLGOModel(model); 
   auto developmentModeAdvisorFunc = [this](bool defaultAdvice) {
           //  return llvm::getDevelopmentModeAdvisor(moduleOp, AM, defaultAdvice);
                       return getReleaseModeAdvisor(moduleOp, AM, defaultAdvice);
@@ -218,13 +248,13 @@ MLInlineAnalysis::getDevelopmentModeAdvisorFunction() {
 }
 
 MLInlineAdvisor::MLInlineAdvisor(
-    ModuleOp &moduleOp, AnalysisManager &AM,
+    Operation *moduleOp, AnalysisManager &AM,
     std::function<
         std::unique_ptr<MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
         GetModelRunner,
     bool defaultAdvice)
     : moduleOp(moduleOp), AM(AM),
-      Opts(getAnalysisOptions(moduleOp)), defaultAdvice(defaultAdvice),
+      Opts(getAnalysisOptions(*moduleOp)), defaultAdvice(defaultAdvice),
       FeatureMap(getInitialFeatureMap()),
       CG(AM.getAnalysis<CallGraph>()),
       InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize),
@@ -239,14 +269,19 @@ MLInlineAdvisor::MLInlineAdvisor(
   // CallGraph CGraph(M);
   // for (auto I = scc_begin(&CGraph); !I.isAtEnd(); ++I) {
   // SymbolTableCollection advisorSymbolTable;
-  const CallGraph CGraph(moduleOp.getOperation());
+  // const CallGraph CGraph(moduleOp);
+  CallGraph &CGraph = AM.getAnalysis<CallGraph>();
   // const CallGraph *cgPtr = &CGraph;
-  for (auto I = llvm::scc_begin(&CGraph); !I.isAtEnd(); ++I) {
+  const CallGraph *CG = &CGraph;
+
+  for (auto I = llvm::scc_begin(CG); !I.isAtEnd(); ++I) {
     const std::vector<CallGraphNode *> &CGNodes = *I;
     unsigned Level = 0;
     for (auto *CGNode : CGNodes) {
       // llvm::Function *F = CGNode->getFunction();
-
+      // External call graph nodes do not have callable regions.
+      if (CGNode->isExternal())
+        continue;
       Region *region = CGNode->getCallableRegion();
       // 2. Get the parent op (the function op).
       auto funcOp = dyn_cast<FunctionOpInterface>(region->getParentOp());
@@ -287,6 +322,8 @@ MLInlineAdvisor::MLInlineAdvisor(
     }
     for (auto *CGNode : CGNodes) {
       // llvm::Function *F = CGNode->getFunction();
+      if (CGNode->isExternal())
+        continue;
       Region *region = CGNode->getCallableRegion();
 
       // if (F && !F->isDeclaration())
@@ -326,7 +363,7 @@ MLInlineAdvisor::MLInlineAdvisor(
   ModelRunner = GetModelRunner(getFeatureMap());
   if (!ModelRunner) {
     // M.getContext().emitError("Could not create model runner");
-    moduleOp.emitError("Could not create model runner");
+    moduleOp->emitError("Could not create model runner");
     return;
   }
   ModelRunner->switchContext("");
@@ -489,7 +526,12 @@ int64_t MLInlineAdvisor::getModuleIRSize() const {
     // if (!F.isDeclaration())
       // Ret += getIRSize(F);
   // }
-  for (Operation &op : moduleOp.getBody()->getOperations()) {
+
+
+  Block &body = moduleOp->getRegion(0).front();
+
+  // for (Operation &op : moduleOp.getBody()->getOperations()) {
+  for (Operation &op : body.getOperations()) {
     if (auto F = dyn_cast<FunctionOpInterface>(&op))
       if (!F.isExternal())
         Ret += getIRSize(F);
@@ -567,6 +609,11 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
   // Same thing if this is a recursive case.
   // if (MandatoryKind == InlineAdvisor::MandatoryInliningKind::Never ||
       // &Caller == &Callee)
+  if (!Caller || !Callee) {
+      // llvm::errs() << "MLGO: Invalid caller or callee interface\n";
+    return getMandatoryAdvice(CB, false);
+  }
+
   if (Caller == Callee)
     return getMandatoryAdvice(CB, false);
 
@@ -581,7 +628,7 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
     //          << "Won't attempt inlining because module size grew too much.";
     // });
     // return std::make_unique<llvm::InlineAdvice>(this, CB, ORE, Mandatory);
-    return std::make_unique<MLInlineAdvice>(this, CB, false);
+    return std::make_unique<MLInlineAdvice>(this, CB, Caller, Callee, false);
   }
 
   int CostEstimate = 0;
@@ -694,7 +741,7 @@ std::unique_ptr<MLInlineAdvice>
 MLInlineAdvisor::getAdviceFromModel(CallOpInterface CB) {
                                     // llvm::OptimizationRemarkEmitter &ORE) {
   return std::make_unique<MLInlineAdvice>(
-      this, CB, static_cast<bool>(ModelRunner->evaluate<int64_t>()));
+      this, CB, Caller, Callee, static_cast<bool>(ModelRunner->evaluate<int64_t>()));
 }
 
 // /*HERE*/
@@ -774,6 +821,8 @@ void MLInlineAdvisor::print(raw_ostream &OS) const {
 /*HERE*/
 // MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallBase &CB,
 MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
+                              FunctionOpInterface Caller,
+                              FunctionOpInterface Callee,
                                bool Recommendation)
     : CallerIRSize(Advisor->isForcedToStop() ? 0 : Advisor->getIRSize(Caller)),
       CalleeIRSize(Advisor->isForcedToStop() ? 0 : Advisor->getIRSize(Callee)),

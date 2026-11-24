@@ -21,7 +21,8 @@
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/ViewOpGraph.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Analysis/InlineAdvisor.h"
+// #include "llvm/Analysis/InlineAdvisor.h"
+#include "mlir/Analysis/test_MLInlineAnalysis.h"
 #include <limits>
 #include <memory>
 

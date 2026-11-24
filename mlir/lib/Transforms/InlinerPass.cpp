@@ -130,58 +130,78 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
 
 }
 
+// static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
+//                                  unsigned inliningThreshold,
+//                                 std::function<std::unique_ptr<MLInlineAdvisor>(bool)> advisorFunction,
+//                                  bool printInlineAdvisor) {
+//   // bool defaultAdvice = false;
+
+//   auto advisor = advisorFunction(false);
+//   if (!advisor)
+//     llvm_unreachable("Failed to create MLInlineAdvisor");
+
+//   advisor->getAdvice(resolvedCall, false)->isInliningRecommended();
+
+//   // Return early, ratio <= 0U will always be false.
+//   if (inliningThreshold == 0U){
+//     // advisorFunction(false)->getAdvice(resolvedCall, false)->isInliningRecommended();
+//     return false;
+//   }
+//   // Return early, ratio <= -1U will always be true.
+//   if (inliningThreshold == -1U)
+//     return true;
+
+//   Region *callerRegion = resolvedCall.sourceNode->getCallableRegion();
+//   Region *calleeRegion = resolvedCall.targetNode->getCallableRegion();
+
+//   assert(calleeRegion && callerRegion && "unexpected external node");
+
+//   auto countOps = [](Region *region) {
+//     unsigned count = 0;
+//     region->walk([&](Operation *) { ++count; });
+//     return count;
+//   };
+
+//   unsigned callerOps = countOps(callerRegion);
+
+//   // Always inline empty callees (if it is possible at all).
+//   if (callerOps == 0)
+//     return true;
+
+//   unsigned ratio = countOps(calleeRegion) * 100 / callerOps;
+//   LDBG() << "Callee / caller operation ratio (max: " << inliningThreshold
+//          << "%): " << ratio << "%";
+
+//   if (printInlineAdvisor) {
+//     LDBG_OS([&](llvm::raw_ostream &OS) {
+//       advisor->print(OS);
+//     });
+//   }
+
+
+
+//   return ratio <= inliningThreshold;
+
+// }
+
 static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
                                  unsigned inliningThreshold,
                                 std::function<std::unique_ptr<MLInlineAdvisor>(bool)> advisorFunction,
                                  bool printInlineAdvisor) {
-  // bool defaultAdvice = false;
 
-  auto advisor = advisorFunction(false);
+  auto advisor = advisorFunction(isProfitableToInline(resolvedCall, inliningThreshold));
   if (!advisor)
     llvm_unreachable("Failed to create MLInlineAdvisor");
 
-  advisor->getAdvice(resolvedCall, false)->isInliningRecommended();
-
-  // Return early, ratio <= 0U will always be false.
-  if (inliningThreshold == 0U){
-    // advisorFunction(false)->getAdvice(resolvedCall, false)->isInliningRecommended();
-    return false;
-  }
-  // Return early, ratio <= -1U will always be true.
-  if (inliningThreshold == -1U)
-    return true;
-
-  Region *callerRegion = resolvedCall.sourceNode->getCallableRegion();
-  Region *calleeRegion = resolvedCall.targetNode->getCallableRegion();
-
-  assert(calleeRegion && callerRegion && "unexpected external node");
-
-  auto countOps = [](Region *region) {
-    unsigned count = 0;
-    region->walk([&](Operation *) { ++count; });
-    return count;
-  };
-
-  unsigned callerOps = countOps(callerRegion);
-
-  // Always inline empty callees (if it is possible at all).
-  if (callerOps == 0)
-    return true;
-
-  unsigned ratio = countOps(calleeRegion) * 100 / callerOps;
-  LDBG() << "Callee / caller operation ratio (max: " << inliningThreshold
-         << "%): " << ratio << "%";
 
   if (printInlineAdvisor) {
-    advisor->print(llvm::errs());
+  //   LDBG_OS([&](llvm::raw_ostream &OS) {
+  //     advisor->print(OS);
+  //   });
+      advisor->print(llvm::errs());
   }
-
-
-
-  return ratio <= inliningThreshold;
-
+  return advisor->getAdvice(resolvedCall, false)->isInliningRecommended();
 }
-
 
 void InlinerPass::runOnOperation() {
   CallGraph &cg = getAnalysis<CallGraph>();
@@ -214,9 +234,9 @@ void InlinerPass::runOnOperation() {
 #endif
     {
       MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
-      auto advisorFunction = analysis.getDevelopmentModeAdvisorFunction();
+      auto advisorFunction = analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue());
       profitabilityCb = [this, advisorFunction](const Inliner::ResolvedCall &call) {
-        return isProfitableToInline(call, inliningThreshold, advisorFunction, printInlineAdvisor);
+        return isProfitableToInline(call, inliningThreshold, advisorFunction, printInlineAdvisor.getValue());
       };
     }
     break;
@@ -226,15 +246,13 @@ void InlinerPass::runOnOperation() {
     // Advisor = llvm::getReleaseModeAdvisor(M, MAM, GetDefaultAdvice);
     {
       MLInlineAnalysis &analysis = getAnalysis<MLInlineAnalysis>();
-      auto advisorFunction = analysis.getReleaseModeAdvisorFunction();
+      auto advisorFunction = analysis.getReleaseModeAdvisorFunction(mlirMlgoModel.getValue());
       profitabilityCb = [this, advisorFunction](const Inliner::ResolvedCall &call) {
-        return isProfitableToInline(call, inliningThreshold, advisorFunction, printInlineAdvisor);
+        return isProfitableToInline(call, inliningThreshold, advisorFunction, printInlineAdvisor.getValue());
       };
     }
     break;
   } 
-
-
 
 
   // Get an instance of the inliner.

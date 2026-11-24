@@ -47,6 +47,13 @@ class ProfileSummaryInfo;
 // extern const char *const DefaultDecisionName;
 // extern const llvm::TensorSpec DefaultDecisionSpec;
 // extern const char *const RewardName;
+void registerMLInlineAdvisorCLOptions();
+enum class EmitCModelChoice {
+  Default,
+#define MLGO_MODEL(CLASS_NAME, CLI_FLAG) CLASS_NAME,
+// #include "mlir/Analysis/InlinerModels.def"
+#include "llvm/Analysis/InlinerModels.def"
+};
 
 class MLInlineAnalysis {
 public:
@@ -57,20 +64,20 @@ public:
   bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM);
 
   std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-  getReleaseModeAdvisorFunction();
+  getReleaseModeAdvisorFunction(EmitCModelChoice model);
 
   std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-  getDevelopmentModeAdvisorFunction();
+  getDevelopmentModeAdvisorFunction(EmitCModelChoice model);
 
 private:
-  ModuleOp moduleOp;
-  AnalysisManager &AM;
+  Operation *moduleOp;
+  AnalysisManager AM;
 };
 
 class MLInlineAdvisor {
 public:
 /*HERE*/
-  MLInlineAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
+  MLInlineAdvisor(Operation *moduleOp, AnalysisManager &AM,
                   std::function<std::unique_ptr<MLModelRunner>(
                       const std::vector<llvm::TensorSpec> &)>
                       GetModelRunner,
@@ -101,7 +108,7 @@ public:
   static const std::vector<llvm::TensorSpec> &getInitialFeatureMap();
   
   std::unique_ptr<MLInlineAdvisor>
-  getReleaseModeAdvisor(ModuleOp &moduleOp, AnalysisManager &AM,
+  getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
                       bool defaultAdvice);
 
   // std::unique_ptr<MLInlineAdvisor>
@@ -115,8 +122,8 @@ public:
 
 
 protected:
-  ModuleOp &moduleOp;
-  AnalysisManager &AM;
+  Operation *moduleOp;
+  AnalysisManager AM;
   // std::unique_ptr<InlineAdvice> getAdviceImpl(CallBase &CB) override;
   std::unique_ptr<MLInlineAdvice> getAdviceImpl(const Inliner::ResolvedCall &resolvedCall);
 
@@ -188,7 +195,8 @@ private:
 class MLInlineAdvice {
 public:
   // MLInlineAdvice(MLInlineAdvisor *Advisor, CallBase &CB,
-  MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
+  MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB, FunctionOpInterface Caller,
+                              FunctionOpInterface Callee,
                  bool Recommendation);
                 //  llvm::OptimizationRemarkEmitter &ORE, bool Recommendation);
   // ~MLInlineAdvice() override = default;
