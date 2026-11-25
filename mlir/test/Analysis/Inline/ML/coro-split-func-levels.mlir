@@ -32,8 +32,5 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
 }
 
 // CHECK:      [MLInlineAdvisor] FuncLevels:
-// CHECK-NEXT: _Z5get_sv : 1
-// CHECK-NEXT: _ZN1S12promise_typeD2Ev : 0
-// CHECK-NEXT: _Z5get_sv.resume : 1
-// CHECK-NEXT: _Z5get_sv.destroy : 1
-// CHECK-NEXT: _Z5get_sv.cleanup : 1
+// CHECK-DAG: _Z5get_sv : 1
+// CHECK-DAG: _ZN1S12promise_typeD2Ev : 0

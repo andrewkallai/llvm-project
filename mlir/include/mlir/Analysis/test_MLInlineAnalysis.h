@@ -64,16 +64,33 @@ public:
   bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM);
 
   // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-  std::unique_ptr<MLInlineAdvisor>
-  getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice);
+  // std::unique_ptr<MLInlineAdvisor>
+  void
+  getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice,
+    bool printInlineAdvisor);
 
   // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-  std::unique_ptr<MLInlineAdvisor>
-  getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice);
+  // std::unique_ptr<MLInlineAdvisor>
+  void
+  getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice,
+    bool printInlineAdvisor);
+
+  void setMLInlineAdvisor(std::unique_ptr<MLInlineAdvisor> mlInlineAdvisor){ advisor = std::move(mlInlineAdvisor); }
+  MLInlineAdvisor *getMLInlineAdvisor(){ return advisor.get(); }
+
+  void setPrintInlineAdvisor(bool printAdvisor) {
+    printInlineAdvisor = printAdvisor;
+  }
+
+  bool getPrintInlineAdvisor() const {
+    return printInlineAdvisor;
+  }
 
 private:
   Operation *moduleOp;
   AnalysisManager AM;
+  std::unique_ptr<MLInlineAdvisor> advisor;
+  bool printInlineAdvisor = false;
 };
 
 class MLInlineAdvisor {

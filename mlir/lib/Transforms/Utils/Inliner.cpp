@@ -23,6 +23,7 @@
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/test_MLInlineAnalysis.h"
 
 #define DEBUG_TYPE "inlining"
 
@@ -295,6 +296,11 @@ static LogicalResult runTransformOnCGSCCs(
     if (failed(sccTransformer(currentSCC)))
       return failure();
   }
+  // if (auto analysis = am.getCachedAnalysis<MLInlineAnalysis>()) {
+  //   if (analysis->get().getPrintInlineAdvisor())
+  //     if (auto *advisor = analysis->get().getMLInlineAdvisor())
+  //       advisor->print(llvm::errs());
+  // }
   return success();
 }
 
@@ -774,6 +780,8 @@ bool Inliner::Impl::shouldInline(ResolvedCall &resolvedCall) {
   if (!inliner.isProfitableToInline(resolvedCall))
     return false;
 
+  // if (!inliner.isInliningRecommended(resolvedCall))
+    // return false;
   // Otherwise, inline.
   return true;
 }
@@ -793,6 +801,15 @@ LogicalResult Inliner::doInlining() {
   });
   if (failed(result))
     return result;
+
+  
+  if (auto analysis = am.getCachedAnalysis<MLInlineAnalysis>()) {
+    if (analysis->get().getPrintInlineAdvisor())
+      if (auto *advisor = analysis->get().getMLInlineAdvisor())
+        advisor->print(llvm::errs());
+  }
+
+
 
   // After inlining, make sure to erase any callables proven to be dead.
   inlinerIface.eraseDeadCallables();

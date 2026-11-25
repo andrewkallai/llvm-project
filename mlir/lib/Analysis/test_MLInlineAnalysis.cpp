@@ -224,27 +224,35 @@ MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
 
 // bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
 // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-std::unique_ptr<MLInlineAdvisor>
-MLInlineAnalysis::getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice) {
+// std::unique_ptr<MLInlineAdvisor>
+void
+MLInlineAnalysis::getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice, bool printInlineAdvisor) {
   setSelectedMLGOModel(model); 
   // auto releaseModeAdvisorFunc = [this](bool defaultAdvice) {
+
             auto advisor = getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice));
+            setMLInlineAdvisor(std::move(advisor));
+            setPrintInlineAdvisor(printInlineAdvisor);
             // if (!advisor){
                   // llvm_unreachable("getReleaseModeAdvisor returned nullpr");
             // }
-            return advisor;
+            // return advisor;
   // }; 
   // return releaseModeAdvisorFunc;
   // return getReleaseModeAdvisor(moduleOp, AM, defaultAdvice)
 }
 
 // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-std::unique_ptr<MLInlineAdvisor>
-MLInlineAnalysis::getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice) {
+// std::unique_ptr<MLInlineAdvisor>
+void
+MLInlineAnalysis::getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice, bool printInlineAdvisor) {
   setSelectedMLGOModel(model); 
   // auto developmentModeAdvisorFunc = [this](bool defaultAdvice) {
           //  return llvm::getDevelopmentModeAdvisor(moduleOp, AM, defaultAdvice);
-                      return getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice));
+                      auto advisor = getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice));
+                      setMLInlineAdvisor(std::move(advisor));
+                      setPrintInlineAdvisor(printInlineAdvisor);
+                      // return advisor;
 
   // }; 
   // return developmentModeAdvisorFunc;
