@@ -23,7 +23,7 @@
 #include "llvm/Analysis/LazyCallGraph.h"
 #include "llvm/Analysis/LoopInfo.h"
 // #include "llvm/Analysis/MLModelRunner.h"
-#include "llvm/Analysis/OptimizationRemarkEmitter.h"
+// #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 // #include "llvm/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -45,6 +45,8 @@
 #include "mlir/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "mlir/IR/Remarks.h"
+
 
 
 
@@ -474,64 +476,71 @@ int64_t MLInlineAdvisor::getLocalCalls(FunctionOpInterface &F) {
   return getCachedFPI(F).DirectCallsToDefinedFunctions;
 }
 
-// // Update the internal state of the advisor, and force invalidate feature
-// // analysis. Currently, we maintain minimal (and very simple) global state - the
-// // number of functions and the number of static calls. We also keep track of the
-// // total IR size in this module, to stop misbehaving policies at a certain bloat
-// // factor (-ml-advisor-size-increase-threshold)
-// void MLInlineAdvisor::onSuccessfulInlining(const MLInlineAdvice &Advice,
-//                                            bool CalleeWasDeleted) {
-//   assert(!ForceStop);
-//   Function *Caller = Advice.getCaller();
-//   Function *Callee = Advice.getCallee();
-//   // The caller features aren't valid anymore.
-//   {
-//     PreservedAnalyses PA = PreservedAnalyses::all();
-//     PA.abandon<FunctionPropertiesAnalysis>();
-//     PA.abandon<LoopAnalysis>();
-//     FAM.invalidate(*Caller, PA);
-//   }
-//   Advice.updateCachedCallerFPI(FAM);
-//   if (Caller == Callee) {
-//     assert(!CalleeWasDeleted);
-//     // We double-counted CallerAndCalleeEdges - since the caller and callee
-//     // would be the same
-//     assert(Advice.CallerAndCalleeEdges % 2 == 0);
-//     CurrentIRSize += getIRSize(*Caller) - Advice.CallerIRSize;
-//     EdgeCount += getCachedFPI(*Caller).DirectCallsToDefinedFunctions -
-//                  Advice.CallerAndCalleeEdges / 2;
-//     // The NodeCount would stay the same.
-//   } else {
-//     int64_t IRSizeAfter =
-//         getIRSize(*Caller) + (CalleeWasDeleted ? 0 : Advice.CalleeIRSize);
-//     CurrentIRSize += IRSizeAfter - (Advice.CallerIRSize + Advice.CalleeIRSize);
+// Update the internal state of the advisor, and force invalidate feature
+// analysis. Currently, we maintain minimal (and very simple) global state - the
+// number of functions and the number of static calls. We also keep track of the
+// total IR size in this module, to stop misbehaving policies at a certain bloat
+// factor (-ml-advisor-size-increase-threshold)
+void MLInlineAdvisor::onSuccessfulInlining(const MLInlineAdvice &Advice,
+                                           bool CalleeWasDeleted) {
+  assert(!ForceStop);
+  FunctionOpInterface Caller = Advice.getCaller();
+  FunctionOpInterface Callee = Advice.getCallee();
+  // The caller features aren't valid anymore.
+  {
+    // AnalysisManager::PreservedAnalyses PA = PreservedAnalyses::all();
+    // PA.abandon<FunctionPropertiesAnalysis>();
+    // PA.abandon<LoopAnalysis>();
+    // MAM.invalidate(*Caller, PA);
+    AnalysisManager::PreservedAnalyses PA;
+    AM.nest(Caller.getOperation()).invalidate(PA);
+  }
+  // Advice.updateCachedCallerFPI(AM);
+  Advice.updateCachedCallerFPI();
+  if (Caller == Callee) {
+    assert(!CalleeWasDeleted);
+    // We double-counted CallerAndCalleeEdges - since the caller and callee
+    // would be the same
+    assert(Advice.CallerAndCalleeEdges % 2 == 0);
+    CurrentIRSize += getIRSize(Caller) - Advice.CallerIRSize;
+    EdgeCount += getCachedFPI(Caller).DirectCallsToDefinedFunctions -
+                 Advice.CallerAndCalleeEdges / 2;
+    // The NodeCount would stay the same.
+  } else {
+    int64_t IRSizeAfter =
+        getIRSize(Caller) + (CalleeWasDeleted ? 0 : Advice.CalleeIRSize);
+    CurrentIRSize += IRSizeAfter - (Advice.CallerIRSize + Advice.CalleeIRSize);
 
-//     // We can delta-update module-wide features. We know the inlining only
-//     // changed the caller, and maybe the callee (by deleting the latter). Nodes
-//     // are simple to update. For edges, we 'forget' the edges that the caller
-//     // and callee used to have before inlining, and add back what they currently
-//     // have together.
-//     int64_t NewCallerAndCalleeEdges =
-//         getCachedFPI(*Caller).DirectCallsToDefinedFunctions;
+    // We can delta-update module-wide features. We know the inlining only
+    // changed the caller, and maybe the callee (by deleting the latter). Nodes
+    // are simple to update. For edges, we 'forget' the edges that the caller
+    // and callee used to have before inlining, and add back what they currently
+    // have together.
+    int64_t NewCallerAndCalleeEdges =
+        getCachedFPI(Caller).DirectCallsToDefinedFunctions;
 
-//     // A dead function's node is not actually removed from the call graph until
-//     // the end of the call graph walk, but the node no longer belongs to any
-//     // valid SCC.
-//     if (CalleeWasDeleted) {
-//       --NodeCount;
-//       NodesInLastSCC.erase(CG.lookup(*Callee));
-//       DeadFunctions.insert(Callee);
-//     } else {
-//       NewCallerAndCalleeEdges +=
-//           getCachedFPI(*Callee).DirectCallsToDefinedFunctions;
-//     }
-//     EdgeCount += (NewCallerAndCalleeEdges - Advice.CallerAndCalleeEdges);
-//   }
-//   if (CurrentIRSize > Opts.ml_advisor_size_increase_threshold * InitialIRSize)
-//     ForceStop = true;
+    // A dead function's node is not actually removed from the call graph until
+    // the end of the call graph walk, but the node no longer belongs to any
+    // valid SCC.
+    if (CalleeWasDeleted) {
+      --NodeCount;
+      auto callable =
+      dyn_cast<CallableOpInterface>(Callee.getOperation());
 
-//   assert(CurrentIRSize >= 0 && EdgeCount >= 0 && NodeCount >= 0);
-// }
+      if (callable)
+        NodesInLastSCC.erase(CG.lookupNode(callable.getCallableRegion()));
+      DeadFunctions.insert(Callee);
+    } else {
+      NewCallerAndCalleeEdges +=
+          getCachedFPI(Callee).DirectCallsToDefinedFunctions;
+    }
+    EdgeCount += (NewCallerAndCalleeEdges - Advice.CallerAndCalleeEdges);
+  }
+  if (CurrentIRSize > Opts.ml_advisor_size_increase_threshold * InitialIRSize)
+    ForceStop = true;
+
+  assert(CurrentIRSize >= 0 && EdgeCount >= 0 && NodeCount >= 0);
+}
 
 int64_t MLInlineAdvisor::getModuleIRSize() const {
   int64_t Ret = 0;
@@ -848,7 +857,7 @@ MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
                               // FunctionOpInterface Caller,
                               // FunctionOpInterface Callee,
                                bool Recommendation)
-    : Caller(CB->getParentOfType<FunctionOpInterface>()),
+    : Advisor(Advisor), Caller(CB->getParentOfType<FunctionOpInterface>()),
       Callee(dyn_cast_or_null<FunctionOpInterface>(call_interface_impl::resolveCallable(CB, &Advisor->advisorSymbolTable))),
       CallerIRSize(Advisor->isForcedToStop() ? 0 : Advisor->getIRSize(Caller)),
       CalleeIRSize(Advisor->isForcedToStop() ? 0 : Advisor->getIRSize(Callee)),
@@ -857,7 +866,8 @@ MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
                                : (Advisor->getLocalCalls(Caller) +
                                   Advisor->getLocalCalls(Callee))),
       IsInliningRecommended(Recommendation),
-      PreInlineCallerFPI(Advisor->getCachedFPI(Caller)){
+      PreInlineCallerFPI(Advisor->getCachedFPI(Caller)),
+      callLoc(CB->getLoc()){
   // if (Recommendation)
     // FPU.emplace(Advisor->getCachedFPI(getCaller()), CB);
 }
@@ -873,19 +883,24 @@ MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
 //   OR << NV("ShouldInline", isInliningRecommended());
 // }
 
-// /*HERE*/
-// void MLInlineAdvice::updateCachedCallerFPI(FunctionAnalysisManager &FAM) const {
-//   FPU->finish(FAM);
-// }
+void MLInlineAdvice::updateCachedCallerFPI() const {
+  // Advisor->updateCachedFPI(Caller);
+  Advisor->FPICache.erase(getCaller().getOperation());
+  Advisor->getCachedFPI(Caller);
+}
 
-// void MLInlineAdvice::recordInliningImpl() {
-//   ORE.emit([&]() {
-//     OptimizationRemark R(DEBUG_TYPE, "InliningSuccess", DLoc, Block);
-//     reportContextForRemark(R);
-//     return R;
-//   });
-//   getAdvisor()->onSuccessfulInlining(*this, /*CalleeWasDeleted*/ false);
-// }
+void MLInlineAdvice::recordInliningImpl() {
+  // ORE.emit([&]() {
+    // OptimizationRemark R(DEBUG_TYPE, "InliningSuccess", DLoc, Block);
+    // reportContextForRemark(R);
+    // return R;
+  // });
+  auto opts = remark::RemarkOpts::name("InliningSuccess")
+                  .category("Inline");
+  remark::passed(callLoc, opts)
+      << "Successfully inlined call";
+  getAdvisor()->onSuccessfulInlining(*this, /*CalleeWasDeleted*/ false);
+}
 
 // void MLInlineAdvice::recordInliningWithCalleeDeletedImpl() {
 //   ORE.emit([&]() {

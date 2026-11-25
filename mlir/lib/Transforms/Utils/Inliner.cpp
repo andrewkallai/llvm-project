@@ -497,6 +497,17 @@ LogicalResult Inliner::Impl::inlineSCC(InlinerInterfaceImpl &inlinerIface,
             inlineCallsInSCC(inlinerIface, useList, currentSCC, blockedEdges)))
       break;
   } while (++iterationCount < inliner.config.getMaxInliningIterations());
+
+  // if (auto analysis = am.getCachedAnalysis<MLInlineAnalysis>()) {
+  if (auto analysis =
+        inliner.am.getCachedAnalysis<MLInlineAnalysis>()) {
+    if (analysis->get().getPrintInlineAdvisor()){
+      if (auto *advisor = analysis->get().getMLInlineAdvisor()){
+        // advisor->getAdvice(resolvedCall, false)->recordInliningImpl();
+        advisor->print(llvm::errs());
+      }
+    }
+  }
   return success();
 }
 
@@ -802,12 +813,24 @@ LogicalResult Inliner::doInlining() {
   if (failed(result))
     return result;
 
-  
-  if (auto analysis = am.getCachedAnalysis<MLInlineAnalysis>()) {
-    if (analysis->get().getPrintInlineAdvisor())
-      if (auto *advisor = analysis->get().getMLInlineAdvisor())
-        advisor->print(llvm::errs());
+
+  if (auto analysis =
+      am.getCachedAnalysis<MLInlineAnalysis>()) {
+    if (auto *advice = analysis->get().getMLInlineAdvice()){
+      // if(auto advice = advisor->getAdvice(resolvedCall, false)){
+    // if (!advice->isInliningRecommended())
+        advice->recordInliningImpl();
+      // }
+    }
   }
+
+
+  
+  // if (auto analysis = am.getCachedAnalysis<MLInlineAnalysis>()) {
+  //   if (analysis->get().getPrintInlineAdvisor())
+  //     if (auto *advisor = analysis->get().getMLInlineAdvisor())
+  //       advisor->print(llvm::errs());
+  // }
 
 
 

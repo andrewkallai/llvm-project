@@ -78,6 +78,9 @@ public:
   void setMLInlineAdvisor(std::unique_ptr<MLInlineAdvisor> mlInlineAdvisor){ advisor = std::move(mlInlineAdvisor); }
   MLInlineAdvisor *getMLInlineAdvisor(){ return advisor.get(); }
 
+  void setMLInlineAdvice(std::unique_ptr<MLInlineAdvice> mlInlineAdvice){ advice = std::move(mlInlineAdvice); }
+  MLInlineAdvice *getMLInlineAdvice(){ return advice.get(); }
+
   void setPrintInlineAdvisor(bool printAdvisor) {
     printInlineAdvisor = printAdvisor;
   }
@@ -90,6 +93,7 @@ private:
   Operation *moduleOp;
   AnalysisManager AM;
   std::unique_ptr<MLInlineAdvisor> advisor;
+  std::unique_ptr<MLInlineAdvice> advice;
   bool printInlineAdvisor = false;
 };
 
@@ -142,6 +146,10 @@ public:
   void print(raw_ostream &OS) const;
   SymbolTableCollection &advisorSymbolTable;
 
+  // Using std::map to benefit from its iterator / reference non-invalidating
+  // semantics, which make it easy to use `getCachedFPI` results from multiple
+  // calls without needing to copy to avoid invalidation effects.
+  mutable std::map<Operation *, llvm::FunctionPropertiesInfo> FPICache;
 
 protected:
   Operation *moduleOp;
@@ -184,10 +192,6 @@ private:
   getSkipAdviceIfUnreachableCallsite(CallOpInterface CB);
   // getSkipAdviceIfUnreachableCallsite(CallBase &CB);
 
-  // Using std::map to benefit from its iterator / reference non-invalidating
-  // semantics, which make it easy to use `getCachedFPI` results from multiple
-  // calls without needing to copy to avoid invalidation effects.
-  mutable std::map<Operation *, llvm::FunctionPropertiesInfo> FPICache;
 
   // llvm::LazyCallGraph &CG;
   CallGraph &CG;
@@ -202,7 +206,8 @@ private:
 
   const int32_t InitialIRSize = 0;
   int32_t CurrentIRSize = 0;
-  llvm::SmallPtrSet<const llvm::LazyCallGraph::Node *, 1> NodesInLastSCC;
+  // llvm::SmallPtrSet<const llvm::LazyCallGraph::Node *, 1> NodesInLastSCC;
+  llvm::SmallPtrSet<CallGraphNode *, 1> NodesInLastSCC;
   // DenseSet<const llvm::LazyCallGraph::Node *> AllNodes;
   llvm::DenseSet<CallGraphNode *> AllNodes;
   // DenseSet<Function *> DeadFunctions;
@@ -235,7 +240,7 @@ public:
   void recordUnsuccessfulInliningImpl(const llvm::InlineResult &Result);
   void recordUnattemptedInliningImpl();
 
-  // MLInlineAdvisor *const Advisor;
+  MLInlineAdvisor *const Advisor;
 
   FunctionOpInterface Caller;
   FunctionOpInterface Callee;
@@ -246,7 +251,7 @@ public:
   const int64_t CallerIRSize;
   const int64_t CalleeIRSize;
   const int64_t CallerAndCalleeEdges;
-  void updateCachedCallerFPI(llvm::FunctionAnalysisManager &FAM) const;
+  void updateCachedCallerFPI() const;
 
   bool isInliningRecommended() const { return IsInliningRecommended; }
 
@@ -256,14 +261,15 @@ protected:
 
 private:
   void reportContextForRemark(DiagnosticInfoOptimizationBase &OR);
-  // MLInlineAdvisor *getAdvisor() const {
+  MLInlineAdvisor *getAdvisor() const {
   //   // return static_cast<MLInlineAdvisor *>(Advisor);
-  //   return Advisor;
-  // };
+    return Advisor;
+  };
   // Make a copy of the FPI of the caller right before inlining. If inlining
   // fails, we can just update the cache with that value.
   const llvm::FunctionPropertiesInfo PreInlineCallerFPI;
-  std::optional<llvm::FunctionPropertiesUpdater> FPU;
+  // std::optional<llvm::FunctionPropertiesUpdater> FPU;
+  Location callLoc;
 };
 
 } // namespace llvm
