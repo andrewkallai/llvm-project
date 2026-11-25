@@ -63,11 +63,13 @@ public:
 
   bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM);
 
-  std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-  getReleaseModeAdvisorFunction(EmitCModelChoice model);
+  // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
+  std::unique_ptr<MLInlineAdvisor>
+  getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice);
 
-  std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-  getDevelopmentModeAdvisorFunction(EmitCModelChoice model);
+  // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
+  std::unique_ptr<MLInlineAdvisor>
+  getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice);
 
 private:
   Operation *moduleOp;
@@ -81,7 +83,8 @@ public:
                   std::function<std::unique_ptr<MLModelRunner>(
                       const std::vector<llvm::TensorSpec> &)>
                       GetModelRunner,
-                  bool getDefaultAdvice);
+                      std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice);
+                  // bool getDefaultAdvice);
 
   ~MLInlineAdvisor() = default;
   // ~MLInlineAdvisor() override = default;
@@ -109,7 +112,8 @@ public:
   
   std::unique_ptr<MLInlineAdvisor>
   getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
-                      bool defaultAdvice);
+                      std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice);
+                      // bool defaultAdvice);
 
   // std::unique_ptr<MLInlineAdvisor>
   // getDevelopmentModeAdvisor(ModuleOp &moduleOp, ModuleAnalysisManager &AM,
@@ -119,6 +123,7 @@ public:
                                           bool MandatoryOnly = false);
 
   void print(raw_ostream &OS) const;
+  SymbolTableCollection &advisorSymbolTable;
 
 
 protected:
@@ -149,8 +154,11 @@ protected:
   const AnalysisOptions &Opts;
   std::unique_ptr<MLModelRunner> ModelRunner;
   // std::function<bool(CallBase &)> GetDefaultAdvice;
-  bool defaultAdvice;
+  // bool defaultAdvice;
   std::vector<llvm::TensorSpec> FeatureMap;
+
+  std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice;
+
 
 
 private:
@@ -186,7 +194,6 @@ private:
 
   bool ForceStop = false;
   // ProfileSummaryInfo &PSI;
-  SymbolTableCollection &advisorSymbolTable;
 };
 
 /// InlineAdvice that tracks changes post inlining. For that reason, it only
@@ -195,8 +202,8 @@ private:
 class MLInlineAdvice {
 public:
   // MLInlineAdvice(MLInlineAdvisor *Advisor, CallBase &CB,
-  MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB, FunctionOpInterface Caller,
-                              FunctionOpInterface Callee,
+  MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB, //FunctionOpInterface Caller,
+                              // FunctionOpInterface Callee,
                  bool Recommendation);
                 //  llvm::OptimizationRemarkEmitter &ORE, bool Recommendation);
   // ~MLInlineAdvice() override = default;

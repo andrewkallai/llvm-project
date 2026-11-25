@@ -138,7 +138,8 @@ void setSelectedMLGOModel(EmitCModelChoice model) {
 
 std::unique_ptr<MLInlineAdvisor>
 getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
-                            bool defaultAdvice) {
+                            std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice) {
+                            // bool defaultAdvice) {
   const AnalysisOptions &Opts = getAnalysisOptions(*moduleOp);
   if (!isReleaseModelValid<CompiledModelType>(
           // Opts.inliner_interactive_channel_base, getSelectedMLGOModel()))
@@ -154,7 +155,7 @@ getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
             Opts.ml_inliner_model_selector));
   };
   return std::make_unique<MLInlineAdvisor>(moduleOp, AM, RunnerFactory,
-                                           defaultAdvice);
+                                           getDefaultAdvice);
 }
 
 #define DEBUG_TYPE "inline-ml"
@@ -222,29 +223,31 @@ MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
 }
 
 // bool getMLInlineAdvisorDecision(Operation *op, AnalysisManager &AM){
-std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-MLInlineAnalysis::getReleaseModeAdvisorFunction(EmitCModelChoice model) {
+// std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
+std::unique_ptr<MLInlineAdvisor>
+MLInlineAnalysis::getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice) {
   setSelectedMLGOModel(model); 
-  auto releaseModeAdvisorFunc = [this](bool defaultAdvice) {
-            auto advisor = getReleaseModeAdvisor(moduleOp, AM, defaultAdvice);
-            if (!advisor){
-                  llvm_unreachable("getReleaseModeAdvisor returned nullpr");
-            }
+  // auto releaseModeAdvisorFunc = [this](bool defaultAdvice) {
+            auto advisor = getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice));
+            // if (!advisor){
+                  // llvm_unreachable("getReleaseModeAdvisor returned nullpr");
+            // }
             return advisor;
-  }; 
-  return releaseModeAdvisorFunc;
+  // }; 
+  // return releaseModeAdvisorFunc;
   // return getReleaseModeAdvisor(moduleOp, AM, defaultAdvice)
 }
 
-std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
-MLInlineAnalysis::getDevelopmentModeAdvisorFunction(EmitCModelChoice model) {
+// std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
+std::unique_ptr<MLInlineAdvisor>
+MLInlineAnalysis::getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice) {
   setSelectedMLGOModel(model); 
-  auto developmentModeAdvisorFunc = [this](bool defaultAdvice) {
+  // auto developmentModeAdvisorFunc = [this](bool defaultAdvice) {
           //  return llvm::getDevelopmentModeAdvisor(moduleOp, AM, defaultAdvice);
-                      return getReleaseModeAdvisor(moduleOp, AM, defaultAdvice);
+                      return getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice));
 
-  }; 
-  return developmentModeAdvisorFunc;
+  // }; 
+  // return developmentModeAdvisorFunc;
 }
 
 MLInlineAdvisor::MLInlineAdvisor(
@@ -252,13 +255,16 @@ MLInlineAdvisor::MLInlineAdvisor(
     std::function<
         std::unique_ptr<MLModelRunner>(const std::vector<llvm::TensorSpec> &)>
         GetModelRunner,
-    bool defaultAdvice)
-    : moduleOp(moduleOp), AM(AM),
-      Opts(getAnalysisOptions(*moduleOp)), defaultAdvice(defaultAdvice),
+    std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice)
+    // bool defaultAdvice)
+    : advisorSymbolTable(AM.getAnalysis<SymbolTableAnalysis>().getSymbolTables()),
+      moduleOp(moduleOp), AM(AM),
+      Opts(getAnalysisOptions(*moduleOp)),
       FeatureMap(getInitialFeatureMap()),
+      getDefaultAdvice(getDefaultAdvice),
       CG(AM.getAnalysis<CallGraph>()),
-      InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize),
-      advisorSymbolTable(AM.getAnalysis<SymbolTableAnalysis>().getSymbolTables()) {
+      InitialIRSize(getModuleIRSize()),
+      CurrentIRSize(InitialIRSize) {
 
   // Extract the 'call site height' feature - the position of a call site
   // relative to the farthest statically reachable SCC node. We don't mutate
@@ -570,6 +576,16 @@ llvm::FunctionPropertiesInfo &MLInlineAdvisor::getCachedFPI(FunctionOpInterface 
    F.getOperation()->walk([&](Operation *op) {
     if (op != F.getOperation())
       ++FPI.TotalInstructionCount;
+    if (auto CB = dyn_cast<CallOpInterface>(op)) {
+      Operation *calleeOp =
+          call_interface_impl::resolveCallable(CB, &advisorSymbolTable);
+
+      auto Callee =
+          dyn_cast_or_null<FunctionOpInterface>(calleeOp);
+
+      if (Callee && !Callee.isExternal())
+        ++FPI.DirectCallsToDefinedFunctions;
+    }
   });
 
   return FPI;
@@ -628,7 +644,7 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
     //          << "Won't attempt inlining because module size grew too much.";
     // });
     // return std::make_unique<llvm::InlineAdvice>(this, CB, ORE, Mandatory);
-    return std::make_unique<MLInlineAdvice>(this, CB, Caller, Callee, false);
+    return std::make_unique<MLInlineAdvice>(this, CB, false);
   }
 
   int CostEstimate = 0;
@@ -721,7 +737,7 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
   if (!Opts.inliner_interactive_channel_base.empty() &&
       Opts.inliner_interactive_include_default)
     *ModelRunner->getTensor<int64_t>(getFeatureMap().size() - 1) =
-        defaultAdvice;
+        getDefaultAdvice(resolvedCall);
   return getAdviceFromModel(CB);
 }
 
@@ -741,7 +757,7 @@ std::unique_ptr<MLInlineAdvice>
 MLInlineAdvisor::getAdviceFromModel(CallOpInterface CB) {
                                     // llvm::OptimizationRemarkEmitter &ORE) {
   return std::make_unique<MLInlineAdvice>(
-      this, CB, Caller, Callee, static_cast<bool>(ModelRunner->evaluate<int64_t>()));
+      this, CB, static_cast<bool>(ModelRunner->evaluate<int64_t>()));
 }
 
 // /*HERE*/
@@ -821,10 +837,12 @@ void MLInlineAdvisor::print(raw_ostream &OS) const {
 /*HERE*/
 // MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallBase &CB,
 MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
-                              FunctionOpInterface Caller,
-                              FunctionOpInterface Callee,
+                              // FunctionOpInterface Caller,
+                              // FunctionOpInterface Callee,
                                bool Recommendation)
-    : CallerIRSize(Advisor->isForcedToStop() ? 0 : Advisor->getIRSize(Caller)),
+    : Caller(CB->getParentOfType<FunctionOpInterface>()),
+      Callee(dyn_cast_or_null<FunctionOpInterface>(call_interface_impl::resolveCallable(CB, &Advisor->advisorSymbolTable))),
+      CallerIRSize(Advisor->isForcedToStop() ? 0 : Advisor->getIRSize(Caller)),
       CalleeIRSize(Advisor->isForcedToStop() ? 0 : Advisor->getIRSize(Callee)),
       CallerAndCalleeEdges(Advisor->isForcedToStop()
                                ? 0
