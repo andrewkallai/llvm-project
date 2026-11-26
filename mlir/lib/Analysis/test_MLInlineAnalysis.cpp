@@ -539,6 +539,17 @@ void MLInlineAdvisor::onSuccessfulInlining(const MLInlineAdvice &Advice,
   if (CurrentIRSize > Opts.ml_advisor_size_increase_threshold * InitialIRSize)
     ForceStop = true;
 
+  llvm::errs() << "MLGO successful-inline accounting:\n"
+             << "CurrentIRSize: " << CurrentIRSize << "\n"
+             << "InitialIRSize: " << InitialIRSize << "\n"
+             << "CallerIRSize: " << Advice.CallerIRSize << "\n"
+             << "CalleeIRSize: " << Advice.CalleeIRSize << "\n"
+             << "CallerAndCalleeEdges: "
+             << Advice.CallerAndCalleeEdges << "\n"
+             << "EdgeCount: " << EdgeCount << "\n"
+             << "NodeCount: " << NodeCount << "\n"
+             << "CalleeWasDeleted: " << CalleeWasDeleted << "\n";
+
   assert(CurrentIRSize >= 0 && EdgeCount >= 0 && NodeCount >= 0);
 }
 

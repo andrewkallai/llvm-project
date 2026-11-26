@@ -507,6 +507,10 @@ LogicalResult Inliner::Impl::inlineSCC(InlinerInterfaceImpl &inlinerIface,
         advisor->print(llvm::errs());
       }
     }
+    // if (auto *advice = analysis->get().getMLInlineAdvice()){
+    //   if (advice->isInliningRecommended())
+    //     advice->recordInliningImpl();
+    // }
   }
   return success();
 }
@@ -660,7 +664,10 @@ Inliner::Impl::inlineCallsInSCC(InlinerInterfaceImpl &inlinerIface,
     LDBG() << "}";
   });
 
-  // Try to inline each of the call operations. Don't cache the end iterator
+  MLInlineAdvice *advice = nullptr;
+  auto analysis = inliner.am.getCachedAnalysis<MLInlineAnalysis>();
+
+          // Try to inline each of the call operations. Don't cache the end iterator
   // here as more calls may be added during inlining.
   bool inlinedAnyCalls = false;
   for (unsigned i = 0; i < calls.size(); ++i) {
@@ -734,6 +741,17 @@ Inliner::Impl::inlineCallsInSCC(InlinerInterfaceImpl &inlinerIface,
       useList.eraseNode(it.targetNode);
       deadNodes.insert(it.targetNode);
     }
+    // if (auto analysis =
+          // inliner.am.getCachedAnalysis<MLInlineAnalysis>()) {
+      // if (auto *advice = analysis->get().getMLInlineAdvice()){
+    if(analysis){
+      if((advice = analysis->get().getMLInlineAdvice())){
+        if (advice){
+            if (advice->isInliningRecommended())
+              advice->recordInliningImpl();
+        }
+      }
+    }
   }
 
   for (CallGraphNode *node : deadNodes) {
@@ -744,6 +762,7 @@ Inliner::Impl::inlineCallsInSCC(InlinerInterfaceImpl &inlinerIface,
   // edge in the current worklist retain their inlining opportunities.
   blockedEdges.insert(newlyBlockedEdges.begin(), newlyBlockedEdges.end());
   calls.clear();
+
   return success(inlinedAnyCalls);
 }
 
@@ -814,15 +833,15 @@ LogicalResult Inliner::doInlining() {
     return result;
 
 
-  if (auto analysis =
-      am.getCachedAnalysis<MLInlineAnalysis>()) {
-    if (auto *advice = analysis->get().getMLInlineAdvice()){
-      // if(auto advice = advisor->getAdvice(resolvedCall, false)){
-    // if (!advice->isInliningRecommended())
-        advice->recordInliningImpl();
-      // }
-    }
-  }
+  // if (auto analysis =
+  //     am.getCachedAnalysis<MLInlineAnalysis>()) {
+  //   if (auto *advice = analysis->get().getMLInlineAdvice()){
+  //     // if(auto advice = advisor->getAdvice(resolvedCall, false)){
+  //   // if (!advice->isInliningRecommended())
+  //       advice->recordInliningImpl();
+  //     // }
+  //   }
+  // }
 
 
   
