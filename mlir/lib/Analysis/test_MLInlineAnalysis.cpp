@@ -46,6 +46,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "mlir/IR/Remarks.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
 
 
@@ -70,12 +71,7 @@ using CompiledModelType = NoopSavedModelImpl;
 // #include "mlir/Analysis/InlinerModels.h"
 #include "llvm/Analysis/InlinerModels.h"
 
-// enum class EmitCModelChoice {
-//   Default,
-// #define MLGO_MODEL(CLASS_NAME, CLI_FLAG) CLASS_NAME,
-// // #include "mlir/Analysis/InlinerModels.def"
-// #include "llvm/Analysis/InlinerModels.def"
-// };
+
 
 static EmitCModelChoice SelectedMLGOModel =
     EmitCModelChoice::Default;
@@ -631,40 +627,32 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
 
   FunctionOpInterface Caller = CB->getParentOfType<FunctionOpInterface>();
   Operation *calleeOp = call_interface_impl::resolveCallable(CB, &advisorSymbolTable);
-  // FunctionOpInterface Callee = dyn_cast_or_null<FunctionOpInterface>(calleeOp);
   FunctionOpInterface Callee = dyn_cast_or_null<FunctionOpInterface>(calleeOp);
 
-  // if (Opts.ml_inliner_skip_policy == SkipMLPolicyCriteria::IfCallerIsNotCold) {
-  //   if (!PSI.isFunctionEntryCold(&Caller)) {
-  //     // Return a MLInlineAdvice, despite delegating to the default advice,
-  //     // because we need to keep track of the internal state. This is different
-  //     // from the other instances where we return a "default" InlineAdvice,
-  //     // which happen at points we won't come back to the MLAdvisor for
-  //     // decisions requiring that state.
-  //     // return ForceStop ? std::make_unique<llvm::InlineAdvice>(this, CB, ORE,
-  //     //                                                   GetDefaultAdvice(CB))
-  //     //                  : std::make_unique<MLInlineAdvice>(this, CB, ORE,
-  //     //                                                     GetDefaultAdvice(CB));
+  if (Opts.ml_inliner_skip_policy == SkipMLPolicyCriteria::IfCallerIsNotCold) {
+    if (!Caller.getOperation()->hasAttr("cold")) {
 
-  //   }
-  // }
-  // auto MandatoryKind = InlineAdvisor::getMandatoryKind(CB, FAM, ORE);
+      // Return a MLInlineAdvice, despite delegating to the default advice,
+      // because we need to keep track of the internal state. This is different
+      // from the other instances where we return a "default" InlineAdvice,
+      // which happen at points we won't come back to the MLAdvisor for
+      // decisions requiring that state.
+      return std::make_unique<MLInlineAdvice>(this, CB, getDefaultAdvice(resolvedCall));
+    }
+  }
+  auto MandatoryKind = MLInlineAdvisor::getMandatoryKind(CB, AM);
   // If this is a "never inline" case, there won't be any changes to internal
   // state we need to track, so we can just return the base InlineAdvice, which
   // will do nothing interesting.
   // Same thing if this is a recursive case.
-  // if (MandatoryKind == InlineAdvisor::MandatoryInliningKind::Never ||
-      // &Caller == &Callee)
-  if (!Caller || !Callee) {
-      // llvm::errs() << "MLGO: Invalid caller or callee interface\n";
+  if (MandatoryKind == MLInlineAdvisor::MandatoryInliningKind::Never ||
+    (Caller == Callee) || (!Caller || !Callee)){
     return getMandatoryAdvice(CB, false);
   }
 
-  if (Caller == Callee)
-    return getMandatoryAdvice(CB, false);
 
-  // bool Mandatory =
-      // MandatoryKind == llvm::InlineAdvisor::MandatoryInliningKind::Always;
+  bool Mandatory =
+      MandatoryKind == MLInlineAdvisor::MandatoryInliningKind::Always;
 
   // If we need to stop, we won't want to track anymore any state changes, so
   // we just return the base InlineAdvice, which acts as a noop.
@@ -696,13 +684,11 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
   //   return std::make_unique<llvm::InlineAdvice>(this, CB, ORE, false);
   // }
 
-  // if (Mandatory)
-  //   return getMandatoryAdvice(CB, true);
+  if (Mandatory)
+    return getMandatoryAdvice(CB, true);
 
   auto NumCtantParams = 0;
-  // for (auto I = CB.arg_begin(), E = CB.arg_end(); I != E; ++I) {
-  //   NumCtantParams += (isa<Constant>(*I));
-  // }
+
   for (Value arg : CB.getArgOperands()) {
     if (matchPattern(arg, m_Constant())) {
       NumCtantParams++;
@@ -712,6 +698,13 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
 
   auto &CallerBefore = getCachedFPI(Caller);
   auto &CalleeBefore = getCachedFPI(Callee);
+
+  auto isAvailableExternally = [](FunctionOpInterface F) {
+    auto llvmFunc = dyn_cast<LLVM::LLVMFuncOp>(F.getOperation());
+
+    return llvmFunc &&
+          llvmFunc.getLinkage() == LLVM::Linkage::AvailableExternally;
+  };
 
   *ModelRunner->getTensor<int64_t>(llvm::FeatureIndex::callee_basic_block_count) =
       CalleeBefore.BasicBlockCount;
@@ -735,11 +728,9 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
       CalleeBefore.Uses;
   *ModelRunner->getTensor<int64_t>(llvm::FeatureIndex::cost_estimate) = CostEstimate;
   *ModelRunner->getTensor<int64_t>(llvm::FeatureIndex::is_callee_avail_external) =
-      false;
-      // Callee.hasAvailableExternallyLinkage();
+          isAvailableExternally(Callee);
   *ModelRunner->getTensor<int64_t>(llvm::FeatureIndex::is_caller_avail_external) =
-      false;
-      // Caller.hasAvailableExternallyLinkage();
+          isAvailableExternally(Caller);
 
   // if (UseIR2Vec) {
   //   // Python side expects float embeddings. The IR2Vec embeddings are doubles
@@ -757,12 +748,34 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
   //                FeatureIndex::caller_embedding);
   // }
 
+
+  Region *CallerRegion =
+      resolvedCall.sourceNode->getCallableRegion();
+  Region *CalleeRegion =
+      resolvedCall.targetNode->getCallableRegion();
+
+  if (!CallerRegion || !CalleeRegion)
+    return std::make_unique<MLInlineAdvice>(this, CB, false);
+
+  auto countOps = [](Region *region) -> int64_t {
+    unsigned count = 0;
+    region->walk([&](Operation *) {
+      ++count;
+    });
+    return count;
+  };
+
+  unsigned CallerOps = countOps(CallerRegion);
+  unsigned CalleeOps = countOps(CalleeRegion);
+  unsigned ratio = CalleeOps * 100 / CallerOps;
+
   // Add the cost features
-  // for (size_t I = 0;
-  //      I < static_cast<size_t>(llvm::InlineCostFeatureIndex::NumberOfFeatures); ++I) {
-  //   *ModelRunner->getTensor<int64_t>(inlineCostFeatureToMlFeature(
-  //       static_cast<llvm::InlineCostFeatureIndex>(I))) = CostFeatures->at(I);
-  // }
+  for (size_t I = 0;
+       I < static_cast<size_t>(llvm::InlineCostFeatureIndex::NumberOfFeatures); ++I) {
+    *ModelRunner->getTensor<int64_t>(inlineCostFeatureToMlFeature(
+        static_cast<llvm::InlineCostFeatureIndex>(I))) = ratio;
+  }
+ 
   // This one would have been set up to be right at the end.
   if (!Opts.inliner_interactive_channel_base.empty() &&
       Opts.inliner_interactive_include_default)
@@ -771,26 +784,71 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
   return getAdviceFromModel(CB);
 }
 
-std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdvice(const Inliner::ResolvedCall &resolvedCall,
-                                                       bool MandatoryOnly) {
-  // if (!MandatoryOnly)
-    return getAdviceImpl(resolvedCall);
-  // bool Advice = CB.getCaller() != CB.getCalledFunction() &&
-                // MandatoryInliningKind::Always ==
-                    // getMandatoryKind(CB, FAM, getCallerORE(CB));
-  // return getMandatoryAdvice(CB, Advice);
+MLInlineAdvisor::MandatoryInliningKind
+MLInlineAdvisor::getMandatoryKind(CallOpInterface &CB,
+                                  AnalysisManager &am) {
+  // auto Callee = CB.getCalledFunction();
+
+  // auto GetTLI = [&](Function &F) -> const TargetLibraryInfo & {
+  //   return AM.getResult<TargetLibraryAnalysis>(F);
+  // };
+
+  // auto &TIR = FAM.getResult<TargetIRAnalysis>(*CB.getCaller());
+
+  // auto TrivialDecision =
+  //     llvm::getAttributeBasedInliningDecision(CB, &Callee, TIR, GetTLI);
+
+  // if (TrivialDecision) {
+  //   if (TrivialDecision->isSuccess())
+  //     return MandatoryInliningKind::Always;
+  //   else
+  //     return MandatoryInliningKind::Never;
+  // }
+  // return MandatoryInliningKind::NotMandatory;
+
+  Operation *callee =
+      call_interface_impl::resolveCallable(CB, &am.getAnalysis<SymbolTableAnalysis>().getSymbolTables());
+
+  if (!callee)
+    return MandatoryInliningKind::NotMandatory;
+
+  auto hasAttr = [](Operation *op, StringRef name) {
+    auto attrs = op->getAttrOfType<ArrayAttr>("passthrough");
+    return attrs &&
+           llvm::is_contained(
+               attrs, StringAttr::get(op->getContext(), name));
+  };
+
+  if (hasAttr(callee, "noinline"))
+    return MandatoryInliningKind::Never;
+
+  if (hasAttr(callee, "alwaysinline"))
+    return MandatoryInliningKind::Always;
+
+  return MandatoryInliningKind::NotMandatory;
 }
 
-/*HERE*/
+std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdvice(const Inliner::ResolvedCall &resolvedCall,
+                                                       bool MandatoryOnly){
+
+  CallOpInterface CB = resolvedCall.call;
+
+  if (!MandatoryOnly)
+    return getAdviceImpl(resolvedCall);
+
+  bool advice =
+      resolvedCall.sourceNode != resolvedCall.targetNode &&
+      MandatoryInliningKind::Always == getMandatoryKind(CB, AM);
+
+  return getMandatoryAdvice(CB, advice);
+}
+
 std::unique_ptr<MLInlineAdvice>
-// MLInlineAdvisor::getAdviceFromModel(CallBase &CB,
 MLInlineAdvisor::getAdviceFromModel(CallOpInterface CB) {
-                                    // llvm::OptimizationRemarkEmitter &ORE) {
   return std::make_unique<MLInlineAdvice>(
       this, CB, static_cast<bool>(ModelRunner->evaluate<int64_t>()));
 }
 
-// /*HERE*/
 std::unique_ptr<MLInlineAdvice>
 MLInlineAdvisor::getSkipAdviceIfUnreachableCallsite(CallOpInterface CB) {
   auto caller = CB->getParentOfType<FunctionOpInterface>();
@@ -803,8 +861,6 @@ MLInlineAdvisor::getSkipAdviceIfUnreachableCallsite(CallOpInterface CB) {
   return nullptr;
 }
 
-/*HERE*/
-// std::unique_ptr<InlineAdvice> MLInlineAdvisor::getMandatoryAdvice(CallBase &CB,
 std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getMandatoryAdvice(CallOpInterface CB,
                                                                   bool Advice) {
   // Make sure we track inlinings in all cases - mandatory or not.
@@ -817,16 +873,12 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getMandatoryAdvice(CallOpInterf
   // state we need to track, so we can just return the base InlineAdvice, which
   // will do nothing interesting.
   // Same if we are forced to stop - we don't track anymore.
-  // return std::make_unique<llvm::InlineAdvice>(this, CB, getCallerORE(CB), Advice);
   return std::make_unique<MLInlineAdvice>(this, CB, Advice);
 }
 
-/*HERE*/
-// MLInlineAdvisor::getMandatoryAdviceImpl(CallBase &CB) {
 std::unique_ptr<MLInlineAdvice>
 MLInlineAdvisor::getMandatoryAdviceImpl(CallOpInterface &CB) {
   return std::make_unique<MLInlineAdvice>(this, CB, true);
-  // return std::make_unique<MLInlineAdvice>(this, CB, getCallerORE(CB), true);
 }
 
 void MLInlineAdvisor::print(raw_ostream &OS) const {
@@ -864,11 +916,7 @@ void MLInlineAdvisor::print(raw_ostream &OS) const {
   OS << "\n";
 }
 
-/*HERE*/
-// MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallBase &CB,
 MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
-                              // FunctionOpInterface Caller,
-                              // FunctionOpInterface Callee,
                                bool Recommendation)
     : Advisor(Advisor), Caller(CB->getParentOfType<FunctionOpInterface>()),
       Callee(dyn_cast_or_null<FunctionOpInterface>(call_interface_impl::resolveCallable(CB, &Advisor->advisorSymbolTable))),
@@ -881,8 +929,9 @@ MLInlineAdvice::MLInlineAdvice(MLInlineAdvisor *Advisor, CallOpInterface CB,
       IsInliningRecommended(Recommendation),
       PreInlineCallerFPI(Advisor->getCachedFPI(Caller)),
       callLoc(CB->getLoc()){
-  // if (Recommendation)
-    // FPU.emplace(Advisor->getCachedFPI(getCaller()), CB);
+
+  if (Recommendation)
+    Advisor->getCachedFPI(getCaller());
 }
 
 // /*HERE*/

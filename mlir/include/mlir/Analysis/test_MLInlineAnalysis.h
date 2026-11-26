@@ -165,6 +165,12 @@ protected:
   // virtual std::unique_ptr<MLInlineAdvice> getMandatoryAdviceImpl(CallOpInterface &CB);
   std::unique_ptr<MLInlineAdvice> getMandatoryAdviceImpl(CallOpInterface &CB);
 
+  enum class MandatoryInliningKind { NotMandatory, Always, Never };
+
+  static MandatoryInliningKind getMandatoryKind(CallOpInterface &CB,
+                                                AnalysisManager &am);
+
+
   // virtual std::unique_ptr<MLInlineAdvice>
   std::unique_ptr<MLInlineAdvice>
   getAdviceFromModel(CallOpInterface CB);

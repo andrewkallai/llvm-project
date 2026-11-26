@@ -103,6 +103,7 @@ add_mlir_library(MLIRAnalysisBase
   MLIRIR
   MLIRSideEffectInterfaces
   MLIRViewLikeInterface
+  MLIRLLVMDialect
 #  ${MLLinkDeps}
 
   )
