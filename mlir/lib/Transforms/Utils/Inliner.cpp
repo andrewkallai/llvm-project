@@ -498,10 +498,14 @@ LogicalResult Inliner::Impl::inlineSCC(InlinerInterfaceImpl &inlinerIface,
       break;
   } while (++iterationCount < inliner.config.getMaxInliningIterations());
 
+  bool hasCallableNode = llvm::any_of(
+    currentSCC, [](CallGraphNode *node) {
+      return !node->isExternal();
+  });
   // if (auto analysis = am.getCachedAnalysis<MLInlineAnalysis>()) {
   if (auto analysis =
         inliner.am.getCachedAnalysis<MLInlineAnalysis>()) {
-    if (analysis->get().getPrintInlineAdvisor()){
+    if (hasCallableNode && analysis->get().getPrintInlineAdvisor()){
       if (auto *advisor = analysis->get().getMLInlineAdvisor()){
         // advisor->getAdvice(resolvedCall, false)->recordInliningImpl();
         advisor->print(llvm::errs());
@@ -745,11 +749,10 @@ Inliner::Impl::inlineCallsInSCC(InlinerInterfaceImpl &inlinerIface,
           // inliner.am.getCachedAnalysis<MLInlineAnalysis>()) {
       // if (auto *advice = analysis->get().getMLInlineAdvice()){
     if(analysis){
-      if((advice = analysis->get().getMLInlineAdvice())){
-        if (advice){
-            if (advice->isInliningRecommended())
-              advice->recordInliningImpl();
-        }
+      advice = analysis->get().getMLInlineAdvice();
+      if(advice){
+        if(advice->isInliningRecommended())
+          advice->recordInliningImpl();
       }
     }
   }

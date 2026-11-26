@@ -296,8 +296,10 @@ MLInlineAdvisor::MLInlineAdvisor(
     for (auto *CGNode : CGNodes) {
       // llvm::Function *F = CGNode->getFunction();
       // External call graph nodes do not have callable regions.
-      if (CGNode->isExternal())
+      if (CGNode->isExternal()){
+        // llvm::errs() << "  XExternal node: " << CGNode << "\n";
         continue;
+      }
       Region *region = CGNode->getCallableRegion();
       // 2. Get the parent op (the function op).
       auto funcOp = dyn_cast<FunctionOpInterface>(region->getParentOp());
@@ -539,16 +541,16 @@ void MLInlineAdvisor::onSuccessfulInlining(const MLInlineAdvice &Advice,
   if (CurrentIRSize > Opts.ml_advisor_size_increase_threshold * InitialIRSize)
     ForceStop = true;
 
-  llvm::errs() << "MLGO successful-inline accounting:\n"
-             << "CurrentIRSize: " << CurrentIRSize << "\n"
-             << "InitialIRSize: " << InitialIRSize << "\n"
-             << "CallerIRSize: " << Advice.CallerIRSize << "\n"
-             << "CalleeIRSize: " << Advice.CalleeIRSize << "\n"
-             << "CallerAndCalleeEdges: "
-             << Advice.CallerAndCalleeEdges << "\n"
-             << "EdgeCount: " << EdgeCount << "\n"
-             << "NodeCount: " << NodeCount << "\n"
-             << "CalleeWasDeleted: " << CalleeWasDeleted << "\n";
+  // llvm::errs() << "MLGO successful-inline accounting:\n"
+  //            << "CurrentIRSize: " << CurrentIRSize << "\n"
+  //            << "InitialIRSize: " << InitialIRSize << "\n"
+  //            << "CallerIRSize: " << Advice.CallerIRSize << "\n"
+  //            << "CalleeIRSize: " << Advice.CalleeIRSize << "\n"
+  //            << "CallerAndCalleeEdges: "
+  //            << Advice.CallerAndCalleeEdges << "\n"
+  //            << "EdgeCount: " << EdgeCount << "\n"
+  //            << "NodeCount: " << NodeCount << "\n"
+  //            << "CalleeWasDeleted: " << CalleeWasDeleted << "\n";
 
   assert(CurrentIRSize >= 0 && EdgeCount >= 0 && NodeCount >= 0);
 }
