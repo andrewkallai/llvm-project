@@ -112,8 +112,8 @@ public:
 
   // void onPassEntry(llvm::LazyCallGraph::SCC *SCC);
   // void onPassExit(llvm::LazyCallGraph::SCC *SCC);
-  void onPassEntry(llvm::ArrayRef<CallGraphNode *> SCC);
-  void onPassExit(llvm::ArrayRef<CallGraphNode *> SCC);
+  void onPassEntry(llvm::ArrayRef<CallGraphNode *> curSCC);
+  void onPassExit(llvm::ArrayRef<CallGraphNode *> curSCC);
 
   // int64_t getIRSize(Function &F) const {
   int64_t getIRSize(FunctionOpInterface &F) const {

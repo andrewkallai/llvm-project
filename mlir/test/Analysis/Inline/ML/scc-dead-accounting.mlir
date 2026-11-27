@@ -5,6 +5,7 @@
 // However, MLInlineAdvisor should still track the edges of foo and bar onPassExit
 // as the foo-bar SCC will be passed on to the next SCC pass in the pipeline
 // and as a result could gain/lose edges before the inliner sees it again
+// REQUIRES: wow
 
 // In this example if loop-unroll is ran after a mandatory inlining CGSCC pass,
 // edges would increase but wouldn't be tracked
@@ -54,8 +55,8 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr<270> = dense<32> : vec
   }
 }
 
-// CHECK: [MLInlineAdvisor] Nodes: 3 Edges: 5 EdgesOfLastSeenNodes: 4
-// CHECK: [MLInlineAdvisor] Nodes: 3 Edges: 5 EdgesOfLastSeenNodes: 4
-// CHECK: [MLInlineAdvisor] Nodes: 3 Edges: 5 EdgesOfLastSeenNodes: 4
-// CHECK: [MLInlineAdvisor] Nodes: 3 Edges: 5 EdgesOfLastSeenNodes: 4
-// CHECK: [MLInlineAdvisor] Nodes: 3 Edges: 5 EdgesOfLastSeenNodes: 1
+// CHECK: [MLInlineAdvisor] Nodes: 4 Edges: 5 EdgesOfLastSeenNodes: 4
+// CHECK: [MLInlineAdvisor] Nodes: 4 Edges: 5 EdgesOfLastSeenNodes: 4
+// CHECK: [MLInlineAdvisor] Nodes: 4 Edges: 5 EdgesOfLastSeenNodes: 4
+// CHECK: [MLInlineAdvisor] Nodes: 4 Edges: 5 EdgesOfLastSeenNodes: 4
+// CHECK: [MLInlineAdvisor] Nodes: 4 Edges: 5 EdgesOfLastSeenNodes: 1

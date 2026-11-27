@@ -391,8 +391,8 @@ unsigned MLInlineAdvisor::getInitialFunctionLevel(FunctionOpInterface F) const {
   return node ? FunctionLevels.lookup(node) : 0;
 }
 
-void MLInlineAdvisor::onPassEntry(llvm::ArrayRef<CallGraphNode *> SCC) {
-  if (SCC.empty() || ForceStop)
+void MLInlineAdvisor::onPassEntry(llvm::ArrayRef<CallGraphNode *> curSCC) {
+  if (curSCC.empty() || ForceStop)
     return;
   FPICache.clear();
   // Function passes executed between InlinerPass runs may have changed the
@@ -414,18 +414,29 @@ void MLInlineAdvisor::onPassEntry(llvm::ArrayRef<CallGraphNode *> SCC) {
   // batch deleted, so we shouldn't see any dead nodes here.
   while (!NodesInLastSCC.empty()) {
     const auto *N = *NodesInLastSCC.begin();
-    assert(!DeadCallGraphNodes.contains(N));
+    assert(!N->isExternal() && !DeadCallGraphNodes.contains(N));
     NodesInLastSCC.erase(N);
+    // llvm::errs() << "Processing node: " << N
+    //         << " external=" << N->isExternal()
+    //         << " dead=" << DeadCallGraphNodes.contains(N)
+    //         << "\n";
     auto F = dyn_cast<FunctionOpInterface>(
       N->getCallableRegion()->getParentOp());
+    assert(F && !F.isExternal());
     EdgeCount += getLocalCalls(F);
     const auto NLevel = FunctionLevels.at(N);
     for (const auto &E : *N) {
       auto *AdjNode = E.getTarget();
+      // llvm::errs() << "AdjNode external="
+            //  << AdjNode->isExternal() << "\n";
+      if (AdjNode->isExternal())
+        continue;
+      // assert(!AdjNode->isExternal());
       auto AdjFunc = dyn_cast<FunctionOpInterface>(
         AdjNode->getCallableRegion()->getParentOp());
+      
 
-      assert(!DeadCallGraphNodes.contains(AdjNode) && (!AdjFunc || AdjFunc.isExternal()));
+      assert(!DeadCallGraphNodes.contains(AdjNode) && (AdjFunc && !AdjFunc.isExternal()));
       auto I = AllNodes.insert(AdjNode);
       // We've discovered a new function.
       if (I.second) {
@@ -442,37 +453,43 @@ void MLInlineAdvisor::onPassEntry(llvm::ArrayRef<CallGraphNode *> SCC) {
   // (Re)use NodesInLastSCC to remember the nodes in the SCC right now,
   // in case the SCC is split before onPassExit and some nodes are split out
   assert(NodesInLastSCC.empty());
-  for (auto *N : SCC)
+  for (auto *N : curSCC)
     NodesInLastSCC.insert(N);
 }
 
-// void MLInlineAdvisor::onPassExit(LazyCallGraph::SCC *CurSCC) {
-//   // No need to keep this around - function passes will invalidate it.
-//   if (!Opts.ml_advisor_keep_fpi_cache)
-//     FPICache.clear();
-//   if (!CurSCC || ForceStop)
-//     return;
-//   // Keep track of the nodes and edges we last saw. Then, in onPassEntry,
-//   // we update the node count and edge count from the subset of these nodes that
-//   // survived.
-//   EdgesOfLastSeenNodes = 0;
+void MLInlineAdvisor::onPassExit(llvm::ArrayRef<CallGraphNode *> curSCC) {
+  // No need to keep this around - function passes will invalidate it.
+  if (!Opts.ml_advisor_keep_fpi_cache)
+    FPICache.clear();
+  if (curSCC.empty() || ForceStop)
+    return;
+  // Keep track of the nodes and edges we last saw. Then, in onPassEntry,
+  // we update the node count and edge count from the subset of these nodes that
+  // survived.
+  EdgesOfLastSeenNodes = 0;
 
-//   // Check on nodes that were in SCC onPassEntry
-//   for (const LazyCallGraph::Node *N : NodesInLastSCC) {
-//     assert(!N->isDead());
-//     EdgesOfLastSeenNodes += getLocalCalls(N->getFunction());
-//   }
+  // Check on nodes that were in SCC onPassEntry
+  for (const CallGraphNode *N : NodesInLastSCC) {
+    auto F = dyn_cast<FunctionOpInterface>(
+      N->getCallableRegion()->getParentOp());
+    assert(!DeadCallGraphNodes.contains(N));
+    EdgesOfLastSeenNodes += getLocalCalls(F);
+  }
 
-//   // Check on nodes that may have got added to SCC
-//   for (const auto &N : *CurSCC) {
-//     assert(!N.isDead());
-//     auto I = NodesInLastSCC.insert(&N);
-//     if (I.second)
-//       EdgesOfLastSeenNodes += getLocalCalls(N.getFunction());
-//   }
-//   assert(NodeCount >= NodesInLastSCC.size());
-//   assert(EdgeCount >= EdgesOfLastSeenNodes);
-// }
+  // Check on nodes that may have got added to SCC
+  for (auto *N : curSCC) {
+    assert(!DeadCallGraphNodes.contains(N));
+    auto I = NodesInLastSCC.insert(N);
+    if (I.second){
+      auto F = dyn_cast<FunctionOpInterface>(
+        N->getCallableRegion()->getParentOp());
+      assert(F && !F.isExternal());
+      EdgesOfLastSeenNodes += getLocalCalls(F);
+    }
+  }
+  assert(NodeCount >= NodesInLastSCC.size());
+  assert(EdgeCount >= EdgesOfLastSeenNodes);
+}
 
 int64_t MLInlineAdvisor::getLocalCalls(FunctionOpInterface &F) {
   return getCachedFPI(F).DirectCallsToDefinedFunctions;
@@ -824,9 +841,16 @@ MLInlineAdvisor::getMandatoryKind(CallOpInterface &CB,
                attrs, StringAttr::get(op->getContext(), name));
   };
 
+  // auto hasPassthroughAttr = [](Operation *op, StringRef name) {
+  //   auto attrs = op->getAttrOfType<ArrayAttr>("passthrough");
+  //   return attrs && llvm::is_contained(
+  //                       attrs, StringAttr::get(op->getContext(), name));
+  // };
+
   if (hasAttr(callee, "noinline"))
     return MandatoryInliningKind::Never;
 
+  // if (hasAttr(callee, "alwaysinline") || hasPassthroughAttr(callee, "alwaysinline"))
   if (hasAttr(callee, "alwaysinline"))
     return MandatoryInliningKind::Always;
 

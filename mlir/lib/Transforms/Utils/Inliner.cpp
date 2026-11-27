@@ -489,6 +489,30 @@ LogicalResult Inliner::Impl::inlineSCC(InlinerInterfaceImpl &inlinerIface,
   // Optimization may replace calls, preventing exact provenance tracking.
   // Conservatively retain proven recursive graph edges across iterations.
   BlockedEdges blockedEdges;
+
+  MLInlineAdvisor *advisor = nullptr;
+  bool printAdvisor = false;
+
+  if (auto analysis =
+          inliner.am.getCachedAnalysis<MLInlineAnalysis>()) {
+    auto &mlAnalysis = analysis->get();
+    advisor = mlAnalysis.getMLInlineAdvisor();
+    printAdvisor = mlAnalysis.getPrintInlineAdvisor();
+  }
+
+  SmallVector<CallGraphNode *, 8> entryNodes(
+      currentSCC.begin(), currentSCC.end());
+
+  bool hasCallableNode = llvm::any_of(
+      currentSCC, [](CallGraphNode *node) {
+        return !node->isExternal();
+    });
+
+  if (advisor && hasCallableNode)
+    advisor->onPassEntry(entryNodes);
+
+  // Preserve the original SCC membership before processing can split it.
+
   do {
     if (failed(optimizeSCC(inlinerIface.cg, useList, currentSCC, context,
                            /*inlinedIntoSCC=*/iterationCount != 0)))
@@ -498,24 +522,24 @@ LogicalResult Inliner::Impl::inlineSCC(InlinerInterfaceImpl &inlinerIface,
       break;
   } while (++iterationCount < inliner.config.getMaxInliningIterations());
 
-  bool hasCallableNode = llvm::any_of(
-    currentSCC, [](CallGraphNode *node) {
-      return !node->isExternal();
-  });
-  // if (auto analysis = am.getCachedAnalysis<MLInlineAnalysis>()) {
-  if (auto analysis =
-        inliner.am.getCachedAnalysis<MLInlineAnalysis>()) {
-    if (hasCallableNode && analysis->get().getPrintInlineAdvisor()){
-      if (auto *advisor = analysis->get().getMLInlineAdvisor()){
-        // advisor->getAdvice(resolvedCall, false)->recordInliningImpl();
-        advisor->print(llvm::errs());
-      }
-    }
-    // if (auto *advice = analysis->get().getMLInlineAdvice()){
-    //   if (advice->isInliningRecommended())
-    //     advice->recordInliningImpl();
-    // }
-  }
+  SmallVector<CallGraphNode *, 8> exitNodes(
+      currentSCC.begin(), currentSCC.end());
+
+  if (advisor && hasCallableNode) {
+    advisor->onPassExit(exitNodes);
+
+    if (printAdvisor)
+      advisor->print(llvm::errs());
+  }  
+  // if (auto analysis =
+  //       inliner.am.getCachedAnalysis<MLInlineAnalysis>()) {
+  //   if (hasCallableNode && analysis->get().getPrintInlineAdvisor()){
+  //     if (auto *advisor = analysis->get().getMLInlineAdvisor()){
+  //       // advisor->getAdvice(resolvedCall, false)->recordInliningImpl();
+  //       advisor->print(llvm::errs());
+  //     }
+  //   }
+  // }
   return success();
 }
 
