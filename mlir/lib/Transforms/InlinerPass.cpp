@@ -190,19 +190,16 @@ static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
                                 //  bool printInlineAdvisor) {
 // static bool isInliningRecommended(const Inliner::ResolvedCall &resolvedCall,
 static bool isProfitableToInline(const Inliner::ResolvedCall &resolvedCall,
-                                                    MLInlineAdvisor *advisor, AnalysisManager am){
+                                                    MLInlineAdvisor *advisor, AnalysisManager am, bool mandatoryInliningFirst){
                                 // std::unique_ptr<MLInlineAdvisor> advisor){
 
   // auto advisor = advisorFunction(isProfitableToInline(resolvedCall, inliningThreshold));
   if (auto analysis =
       am.getCachedAnalysis<MLInlineAnalysis>()) {
-    // if (auto *advisor = analysis->get().getMLInlineAdvisor()){
-    // }
-    if(auto advice = advisor->getAdvice(resolvedCall, false)){
+    if(auto advice = advisor->getAdvice(resolvedCall, mandatoryInliningFirst)){
       bool recommendation = advice->isInliningRecommended();
       analysis->get().setMLInlineAdvice(std::move(advice));
       return recommendation;
-    // if (!advice->isInliningRecommended())
     }
   }
   return false;
@@ -227,6 +224,7 @@ void InlinerPass::runOnOperation() {
   Operation *op = getOperation();
 
   MLInlineAdvisor *advisor = nullptr;
+  bool mandatoryOnly = mandatoryInliningFirst.getValue();
 
   if (!op->hasTrait<OpTrait::SymbolTable>()) {
     op->emitOpError() << " was scheduled to run under the inliner, but does "
@@ -263,8 +261,8 @@ void InlinerPass::runOnOperation() {
       // advisor= analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb);
       analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb, printInlineAdvisor);
       advisor = analysis.getMLInlineAdvisor();
-      profitabilityCb = [advisor, this](const Inliner::ResolvedCall &call) {
-        return isProfitableToInline(call, advisor, getAnalysisManager());
+      profitabilityCb = [advisor, this, &mandatoryOnly](const Inliner::ResolvedCall &call) {
+        return isProfitableToInline(call, advisor, getAnalysisManager(), mandatoryOnly);
       };
       // isInliningRecommendedCb = [this, &advisorFunction](const Inliner::ResolvedCall &call) {
       //   return isInliningRecommended(call, advisorFunction.get());
@@ -284,8 +282,8 @@ void InlinerPass::runOnOperation() {
       // advisor = analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb);
       analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb, printInlineAdvisor);
       advisor = analysis.getMLInlineAdvisor();
-      profitabilityCb = [advisor, this](const Inliner::ResolvedCall &call) {
-        return isProfitableToInline(call, advisor, getAnalysisManager());
+      profitabilityCb = [advisor, this, &mandatoryOnly](const Inliner::ResolvedCall &call) {
+        return isProfitableToInline(call, advisor, getAnalysisManager(), mandatoryOnly);
       };
       // isInliningRecommendedCb = [this, &advisorFunction](const Inliner::ResolvedCall &call) {
         // return isInliningRecommended(call, advisorFunction.get());
@@ -302,6 +300,12 @@ void InlinerPass::runOnOperation() {
   // Run the inlining.
   if (failed(inliner.doInlining()))
     signalPassFailure();
+
+  if (mandatoryOnly){
+    mandatoryOnly = false;
+    if (failed(inliner.doInlining()))
+      signalPassFailure();
+  }
 
   // if (advisor && printInlineAdvisor) {
   //     advisor->print(llvm::errs());

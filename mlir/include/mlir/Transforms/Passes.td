@@ -366,6 +366,9 @@ def InlinerPass : Pass<"inline"> {
 #include "llvm/Analysis/InlinerModels.def"
          )
        }]>,
+       Option<"mandatoryInliningFirst", "mandatory-inlining-first", "bool",
+       /*default=*/"false",
+       "Perform mandatory inlinings module-wide, before performing inlining">,
   ];
 }
 
