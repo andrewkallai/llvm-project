@@ -226,7 +226,6 @@ void InlinerPass::runOnOperation() {
   // as the callgraph will need to resolve references.
   Operation *op = getOperation();
 
-  MLInlineAdvisor *advisor = nullptr;
   bool mandatoryOnly = mandatoryInliningFirst.getValue();
 
   if (!op->hasTrait<OpTrait::SymbolTable>()) {
@@ -263,7 +262,7 @@ void InlinerPass::runOnOperation() {
       // };
       // advisor= analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb);
       analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb, printInlineAdvisor);
-      advisor = analysis.getMLInlineAdvisor();
+      // advisor = analysis.getMLInlineAdvisor();
       profitabilityCb = [this, &mandatoryOnly](const Inliner::ResolvedCall &call) {
         return isProfitableToInline(call, getAnalysisManager(), mandatoryOnly);
       };
@@ -284,7 +283,7 @@ void InlinerPass::runOnOperation() {
       // };
       // advisor = analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb);
       analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb, printInlineAdvisor);
-      advisor = analysis.getMLInlineAdvisor();
+      // advisor = analysis.getMLInlineAdvisor();
       profitabilityCb = [this, &mandatoryOnly](const Inliner::ResolvedCall &call) {
         return isProfitableToInline(call, getAnalysisManager(), mandatoryOnly);
       };

@@ -385,63 +385,66 @@ MLInlineAdvisor::MLInlineAdvisor(
   ForceStop = Opts.ml_inliner_stop_immediately;
 }
 
-/*HERE*/
-// unsigned MLInlineAdvisor::getInitialFunctionLevel(const Function &F) const {
 unsigned MLInlineAdvisor::getInitialFunctionLevel(FunctionOpInterface F) const {
   Region *region = F.getCallableRegion();
   CallGraphNode *node = region ? CG.lookupNode(region) : nullptr;
   return node ? FunctionLevels.lookup(node) : 0;
 }
 
-// void MLInlineAdvisor::onPassEntry(LazyCallGraph::SCC *CurSCC) {
-//   if (!CurSCC || ForceStop)
-//     return;
-//   FPICache.clear();
-//   // Function passes executed between InlinerPass runs may have changed the
-//   // module-wide features.
-//   // The cgscc pass manager rules are such that:
-//   // - if a pass leads to merging SCCs, then the pipeline is restarted on the
-//   // merged SCC
-//   // - if a pass leads to splitting the SCC, then we continue with one of the
-//   // splits
-//   // This means that the NodesInLastSCC is a superset (not strict) of the nodes
-//   // that subsequent passes would have processed
-//   // - in addition, if new Nodes were created by a pass (e.g. CoroSplit),
-//   // they'd be adjacent to Nodes in the last SCC. So we just need to check the
-//   // boundary of Nodes in NodesInLastSCC for Nodes we haven't seen. We don't
-//   // care about the nature of the Edge (call or ref). `FunctionLevels`-wise, we
-//   // record them at the same level as the original node (this is a choice, may
-//   // need revisiting).
-//   // - nodes are only deleted at the end of a call graph walk where they are
-//   // batch deleted, so we shouldn't see any dead nodes here.
-//   while (!NodesInLastSCC.empty()) {
-//     const auto *N = *NodesInLastSCC.begin();
-//     assert(!N->isDead());
-//     NodesInLastSCC.erase(N);
-//     EdgeCount += getLocalCalls(N->getFunction());
-//     const auto NLevel = FunctionLevels.at(N);
-//     for (const auto &E : *(*N)) {
-//       const auto *AdjNode = &E.getNode();
-//       assert(!AdjNode->isDead() && !AdjNode->getFunction().isDeclaration());
-//       auto I = AllNodes.insert(AdjNode);
-//       // We've discovered a new function.
-//       if (I.second) {
-//         ++NodeCount;
-//         NodesInLastSCC.insert(AdjNode);
-//         FunctionLevels[AdjNode] = NLevel;
-//       }
-//     }
-//   }
+void MLInlineAdvisor::onPassEntry(llvm::ArrayRef<CallGraphNode *> SCC) {
+  if (SCC.empty() || ForceStop)
+    return;
+  FPICache.clear();
+  // Function passes executed between InlinerPass runs may have changed the
+  // module-wide features.
+  // The cgscc pass manager rules are such that:
+  // - if a pass leads to merging SCCs, then the pipeline is restarted on the
+  // merged SCC
+  // - if a pass leads to splitting the SCC, then we continue with one of the
+  // splits
+  // This means that the NodesInLastSCC is a superset (not strict) of the nodes
+  // that subsequent passes would have processed
+  // - in addition, if new Nodes were created by a pass (e.g. CoroSplit),
+  // they'd be adjacent to Nodes in the last SCC. So we just need to check the
+  // boundary of Nodes in NodesInLastSCC for Nodes we haven't seen. We don't
+  // care about the nature of the Edge (call or ref). `FunctionLevels`-wise, we
+  // record them at the same level as the original node (this is a choice, may
+  // need revisiting).
+  // - nodes are only deleted at the end of a call graph walk where they are
+  // batch deleted, so we shouldn't see any dead nodes here.
+  while (!NodesInLastSCC.empty()) {
+    const auto *N = *NodesInLastSCC.begin();
+    assert(!DeadCallGraphNodes.contains(N));
+    NodesInLastSCC.erase(N);
+    auto F = dyn_cast<FunctionOpInterface>(
+      N->getCallableRegion()->getParentOp());
+    EdgeCount += getLocalCalls(F);
+    const auto NLevel = FunctionLevels.at(N);
+    for (const auto &E : *N) {
+      auto *AdjNode = E.getTarget();
+      auto AdjFunc = dyn_cast<FunctionOpInterface>(
+        AdjNode->getCallableRegion()->getParentOp());
 
-//   EdgeCount -= EdgesOfLastSeenNodes;
-//   EdgesOfLastSeenNodes = 0;
+      assert(!DeadCallGraphNodes.contains(AdjNode) && (!AdjFunc || AdjFunc.isExternal()));
+      auto I = AllNodes.insert(AdjNode);
+      // We've discovered a new function.
+      if (I.second) {
+        ++NodeCount;
+        NodesInLastSCC.insert(AdjNode);
+        FunctionLevels[AdjNode] = NLevel;
+      }
+    }
+  }
 
-//   // (Re)use NodesInLastSCC to remember the nodes in the SCC right now,
-//   // in case the SCC is split before onPassExit and some nodes are split out
-//   assert(NodesInLastSCC.empty());
-//   for (const auto &N : *CurSCC)
-//     NodesInLastSCC.insert(&N);
-// }
+  EdgeCount -= EdgesOfLastSeenNodes;
+  EdgesOfLastSeenNodes = 0;
+
+  // (Re)use NodesInLastSCC to remember the nodes in the SCC right now,
+  // in case the SCC is split before onPassExit and some nodes are split out
+  assert(NodesInLastSCC.empty());
+  for (auto *N : SCC)
+    NodesInLastSCC.insert(N);
+}
 
 // void MLInlineAdvisor::onPassExit(LazyCallGraph::SCC *CurSCC) {
 //   // No need to keep this around - function passes will invalidate it.
@@ -526,8 +529,12 @@ void MLInlineAdvisor::onSuccessfulInlining(const MLInlineAdvice &Advice,
       auto callable =
       dyn_cast<CallableOpInterface>(Callee.getOperation());
 
-      if (callable)
-        NodesInLastSCC.erase(CG.lookupNode(callable.getCallableRegion()));
+      if (callable){
+        if (auto *node = CG.lookupNode(callable.getCallableRegion())) {
+          NodesInLastSCC.erase(node);
+          DeadCallGraphNodes.insert(node);
+        }
+      }
       DeadFunctions.insert(Callee);
     } else {
       NewCallerAndCalleeEdges +=
@@ -673,7 +680,11 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
     //   return OptimizationRemarkMissed(DEBUG_TYPE, "ForceStop", &CB)
     //          << "Won't attempt inlining because module size grew too much.";
     // });
-    // return std::make_unique<llvm::InlineAdvice>(this, CB, ORE, Mandatory);
+    auto opts = remark::RemarkOpts::name("ForceStop")
+                .category("Inline");
+
+    remark::missed(CB.getOperation()->getLoc(), opts)
+      << "Won't attempt inlining because module size grew too much.";
     return std::make_unique<MLInlineAdvice>(this, CB, false);
   }
 
@@ -799,24 +810,6 @@ std::unique_ptr<MLInlineAdvice> MLInlineAdvisor::getAdviceImpl(//CallOpInterface
 MLInlineAdvisor::MandatoryInliningKind
 MLInlineAdvisor::getMandatoryKind(CallOpInterface &CB,
                                   AnalysisManager &am) {
-  // auto Callee = CB.getCalledFunction();
-
-  // auto GetTLI = [&](Function &F) -> const TargetLibraryInfo & {
-  //   return AM.getResult<TargetLibraryAnalysis>(F);
-  // };
-
-  // auto &TIR = FAM.getResult<TargetIRAnalysis>(*CB.getCaller());
-
-  // auto TrivialDecision =
-  //     llvm::getAttributeBasedInliningDecision(CB, &Callee, TIR, GetTLI);
-
-  // if (TrivialDecision) {
-  //   if (TrivialDecision->isSuccess())
-  //     return MandatoryInliningKind::Always;
-  //   else
-  //     return MandatoryInliningKind::Never;
-  // }
-  // return MandatoryInliningKind::NotMandatory;
 
   Operation *callee =
       call_interface_impl::resolveCallable(CB, &am.getAnalysis<SymbolTableAnalysis>().getSymbolTables());
@@ -977,15 +970,21 @@ void MLInlineAdvice::recordInliningImpl() {
   getAdvisor()->onSuccessfulInlining(*this, /*CalleeWasDeleted*/ false);
 }
 
-// void MLInlineAdvice::recordInliningWithCalleeDeletedImpl() {
-//   ORE.emit([&]() {
-//     OptimizationRemark R(DEBUG_TYPE, "InliningSuccessWithCalleeDeleted", DLoc,
-//                          Block);
-//     reportContextForRemark(R);
-//     return R;
-//   });
-//   getAdvisor()->onSuccessfulInlining(*this, /*CalleeWasDeleted*/ true);
-// }
+void MLInlineAdvice::recordInliningWithCalleeDeletedImpl() {
+  // ORE.emit([&]() {
+  //   OptimizationRemark R(DEBUG_TYPE, "InliningSuccessWithCalleeDeleted", DLoc,
+  //                        Block);
+  //   reportContextForRemark(R);
+  //   return R;
+  // });
+  auto opts =
+    remark::RemarkOpts::name("InliningSuccessWithCalleeDeleted")
+        .category("Inline");
+
+  remark::passed(callLoc, opts)
+    << "Successfully inlined call and deleted callee";
+  getAdvisor()->onSuccessfulInlining(*this, /*CalleeWasDeleted*/ true);
+}
 
 // void MLInlineAdvice::recordUnsuccessfulInliningImpl(
 //     const llvm::InlineResult &Result) {

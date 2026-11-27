@@ -110,10 +110,10 @@ public:
   ~MLInlineAdvisor() = default;
   // ~MLInlineAdvisor() override = default;
 
-  void onPassEntry(llvm::LazyCallGraph::SCC *SCC);
-  void onPassExit(llvm::LazyCallGraph::SCC *SCC);
-  // void onPassEntry(llvm::LazyCallGraph::SCC *SCC) override;
-  // void onPassExit(llvm::LazyCallGraph::SCC *SCC) override;
+  // void onPassEntry(llvm::LazyCallGraph::SCC *SCC);
+  // void onPassExit(llvm::LazyCallGraph::SCC *SCC);
+  void onPassEntry(llvm::ArrayRef<CallGraphNode *> SCC);
+  void onPassExit(llvm::ArrayRef<CallGraphNode *> SCC);
 
   // int64_t getIRSize(Function &F) const {
   int64_t getIRSize(FunctionOpInterface &F) const {
@@ -213,7 +213,8 @@ private:
   const int32_t InitialIRSize = 0;
   int32_t CurrentIRSize = 0;
   // llvm::SmallPtrSet<const llvm::LazyCallGraph::Node *, 1> NodesInLastSCC;
-  llvm::SmallPtrSet<CallGraphNode *, 1> NodesInLastSCC;
+  llvm::SmallPtrSet<const CallGraphNode *, 1> NodesInLastSCC;
+  llvm::SmallPtrSet<CallGraphNode *, 8> DeadCallGraphNodes;
   // DenseSet<const llvm::LazyCallGraph::Node *> AllNodes;
   llvm::DenseSet<CallGraphNode *> AllNodes;
   // DenseSet<Function *> DeadFunctions;
