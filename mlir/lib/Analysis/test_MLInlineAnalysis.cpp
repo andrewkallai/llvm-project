@@ -47,6 +47,7 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "mlir/IR/Remarks.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 
 
 
@@ -614,6 +615,17 @@ llvm::FunctionPropertiesInfo &MLInlineAdvisor::getCachedFPI(FunctionOpInterface 
     }
   });
 
+  Region &region = F.getFunctionBody();
+
+  if (!region.hasOneBlock()) {
+    DominanceInfo domInfo(F.getOperation());
+    CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
+
+    for (Block &block : region)
+      FPI.MaxLoopDepth =
+          std::max(FPI.MaxLoopDepth,  static_cast<int64_t>(loopInfo.getLoopDepth(&block)));
+  }
+
   return FPI;
 }
 
@@ -886,7 +898,8 @@ void MLInlineAdvisor::print(raw_ostream &OS) const {
      << " EdgesOfLastSeenNodes: " << EdgesOfLastSeenNodes << "\n";
   OS << "[MLInlineAdvisor] FPI:\n";
   for (auto I : FPICache) {
-    OS << I.first->getName() << ":\n";
+    OS << SymbolTable::getSymbolName(I.first).getValue() << ":\n";
+    // OS << I.first->getName() << ":\n";
     I.second.print(OS);
     OS << "\n";
   }
