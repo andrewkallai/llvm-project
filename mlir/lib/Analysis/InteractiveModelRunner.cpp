@@ -10,7 +10,7 @@
 //===----------------------------------------------------------------------===//
 #include "mlir/Analysis/InteractiveModelRunner.h"
 #include "mlir/Analysis/AnalysisOptions.h"
-#include "llvm/Analysis/MLModelRunner.h"
+#include "mlir/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/TensorSpec.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"

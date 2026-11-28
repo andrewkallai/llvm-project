@@ -35,27 +35,88 @@ using namespace mlir;
 // }
 
 
+// namespace {
 
+// struct AnalysisOptions {
+//   llvm::cl::opt<std::string> inlinerInteractiveChannelBase{
+//       "inliner-interactive-channel-base", llvm::cl::Hidden,
+//       llvm::cl::desc("Base file path for the interactive model runner"),
+//       llvm::cl::init("")};
 
-llvm::ManagedStatic<AnalysisOptions> clOptions;
+//   llvm::cl::opt<SkipMLPolicyCriteria> mlInlinerSkipPolicy{
+//       "ml-inliner-skip-policy", llvm::cl::Hidden,
+//       llvm::cl::init(SkipMLPolicyCriteria::Never),
+//       llvm::cl::values(
+//           clEnumValN(SkipMLPolicyCriteria::Never, "never", "never"),
+//           clEnumValN(SkipMLPolicyCriteria::IfCallerIsNotCold,
+//                      "if-caller-not-cold",
+//                      "Skip ML policy when the caller is not cold"))};
+// };
+
+// } // namespace
+
+static llvm::ManagedStatic<mlir::AnalysisOptions> clOptions;
 
 void mlir::registerAnalysisCLOptions() {
-  // Construct the options and register them with the command-line parser.
   (void)*clOptions;
 }
 
-const AnalysisOptions &mlir::getAnalysisOptions() {
-  return *clOptions;
-}
+// const AnalysisOptions &mlir::getAnalysisOptions() {
+//   assert(clOptions.isConstructed() &&
+//          "Analysis command-line options were not registered");
+
+//   static const AnalysisOptions opts = [] {
+//     AnalysisOptions result;
+//     result.inliner_interactive_channel_base =
+//         clOptions->inlinerInteractiveChannelBase;
+//     result.ml_inliner_skip_policy = clOptions->mlInlinerSkipPolicy;
+//     return result;
+//   }();
+
+//   return opts;
+// }
 
 
-const AnalysisOptions &mlir::getAnalysisOptions(Operation &op) {
-  return getAnalysisOptions();
-}
-const AnalysisOptions &mlir::getAnalysisOptions(ModuleOp &moduleOp) {
-  return getAnalysisOptions();
+// llvm::ManagedStatic<AnalysisOptions> clOptions;
+
+// static llvm::opt::RegisterLibraryOptions<mlir::AnalysisOptions>
+    // Registration;
+
+// void mlir::registerAnalysisCLOptions() {
+//   // Construct the options and register them with the command-line parser.
+//   (void)*clOptions;
+// }
+
+// const AnalysisOptions &mlir::getAnalysisOptions() {
+//   return *clOptions;
+// }
+
+
+// const AnalysisOptions &mlir::getAnalysisOptions(Operation &op) {
+//   return getAnalysisOptions();
+// }
+// const AnalysisOptions &mlir::getAnalysisOptions(ModuleOp &moduleOp) {
+//   return getAnalysisOptions();
+// }
+
+// const AnalysisOptions &mlir::getAnalysisOptions(MLIRContext &Ctx) {
+//   return getAnalysisOptions();
+// }
+
+
+
+const mlir::AnalysisOptions &
+mlir::getAnalysisOptions(Operation &op) {
+  return getAnalysisOptions(*op.getContext());
 }
 
-const AnalysisOptions &mlir::getAnalysisOptions(MLIRContext &Ctx) {
+const mlir::AnalysisOptions &
+mlir::getAnalysisOptions(ModuleOp &moduleOp) {
+  return getAnalysisOptions(*moduleOp.getContext());
+}
+
+const mlir::AnalysisOptions &
+mlir::getAnalysisOptions(MLIRContext &ctx) {
+  (void)ctx;
   return getAnalysisOptions();
 }

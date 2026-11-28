@@ -369,6 +369,50 @@ def InlinerPass : Pass<"inline"> {
        Option<"mandatoryInliningFirst", "mandatory-inlining-first", "bool",
        /*default=*/"false",
        "Perform mandatory inlinings module-wide, before performing inlining">,
+       Option<"inlinerInteractiveChannelBase",
+       "inliner-interactive-channel-base", "std::string",
+       /*default=*/"\"\"",
+       "Base file path for interactive mode. The incoming filename "
+       "should be <base>.in, and the outgoing filename should be <base>.out">,
+
+    Option<"inlinerInteractiveIncludeDefault",
+          "inliner-interactive-include-default", "bool",
+          /*default=*/"false",
+          "In interactive mode, also send the default policy decision: "
+          "inlining_default">,
+
+    Option<"mlAdvisorKeepFpiCache",
+          "ml-advisor-keep-fpi-cache", "bool",
+          /*default=*/"false",
+          "For testing, keep the ML Inline advisor's FunctionPropertiesInfo cache">,
+
+    Option<"mlAdvisorSizeIncreaseThreshold",
+          "ml-advisor-size-increase-threshold", "float",
+          /*default=*/"2.0f",
+          "Maximum factor by which expected native size may increase "
+          "before blocking further inlining">,
+
+    Option<"mlInlinerModelSelector",
+          "ml-inliner-model-selector", "std::string",
+          /*default=*/"\"\"",
+          "Select the ML inliner model">,
+
+    Option<"mlInlinerSkipPolicy",
+          "ml-inliner-skip-policy", "mlir::SkipMLPolicyCriteria",
+          /*default=*/"mlir::SkipMLPolicyCriteria::Never",
+          "Policy for skipping ML inliner decisions",
+          [{::llvm::cl::values(
+              clEnumValN(mlir::SkipMLPolicyCriteria::Never,
+                          "never", "Never skip ML inliner decisions"),
+              clEnumValN(mlir::SkipMLPolicyCriteria::IfCallerIsNotCold,
+                          "if-caller-not-cold",
+                          "Skip ML decisions when the caller is not cold")
+          )}]>,
+
+    Option<"mlInlinerStopImmediately",
+          "ml-inliner-stop-immediately", "bool",
+          /*default=*/"false",
+          "Stop ML inlining immediately">
   ];
 }
 

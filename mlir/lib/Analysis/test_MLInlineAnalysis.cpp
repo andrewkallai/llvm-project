@@ -140,6 +140,8 @@ getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
                             std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice) {
                             // bool defaultAdvice) {
   const AnalysisOptions &Opts = getAnalysisOptions(*moduleOp);
+  LDBG() << "FAIL TWO";
+  LDBG() << Opts.inliner_interactive_channel_base;
   if (!isReleaseModelValid<CompiledModelType>(
           // Opts.inliner_interactive_channel_base, getSelectedMLGOModel()))
           Opts.inliner_interactive_channel_base, SelectedMLGOModel))

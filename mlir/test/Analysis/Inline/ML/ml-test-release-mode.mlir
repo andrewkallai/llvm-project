@@ -2,7 +2,7 @@
 // adder into switcher. The ML inliner carries out that inlining, resulting in
 // a smaller result (part of it is that adder gets elided).
 //
-// This test uses Inputs/test-module.ll, as it will share it with a similar test
+// This test uses Inputs/test-module.mlir, as it will share it with a similar test
 // for the 'development' mode.
 
 // RUN: mlir-opt --inline='enable-ml-inliner=release mlir-mlgo-model=_test_inc' < %S/Inputs/test-module.mlir 2>&1 | FileCheck %S/Inputs/test-module.mlir --check-prefix=CHECK

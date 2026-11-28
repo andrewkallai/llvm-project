@@ -17,7 +17,7 @@
 #define MLIR_ANALYSIS_RELEASEMODEMODELRUNNER_H
 
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Analysis/MLModelRunner.h"
+#include "mlir/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/TensorSpec.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
