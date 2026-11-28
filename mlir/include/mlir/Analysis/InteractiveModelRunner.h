@@ -49,6 +49,8 @@ public:
     return R->getKind() == MLModelRunner::Kind::Interactive;
   }
   void switchContext(StringRef Name) override {
+    if (!Log)
+      return;
     Log->switchContext(Name);
     Log->flush();
   }

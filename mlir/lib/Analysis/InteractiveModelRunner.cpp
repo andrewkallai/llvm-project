@@ -25,6 +25,10 @@ InteractiveModelRunner::InteractiveModelRunner(
       InputSpecs(Inputs), OutputSpec(Advice),
       InEC(llvm::sys::fs::openFileForRead(InboundName, Inbound)),
       OutputBuffer(OutputSpec.getTotalTensorBufferSize()) {
+  // Just like in the no inference case, this will allocate an appropriately
+  // sized buffer.
+  for (size_t I = 0; I < InputSpecs.size(); ++I)
+    setUpBufferForTensor(I, InputSpecs[I], nullptr);
   if (InEC) {
     emitError(UnknownLoc::get(&Ctx), "Cannot open inbound file: " + InEC.message());
 
@@ -39,10 +43,7 @@ InteractiveModelRunner::InteractiveModelRunner(
     Log = std::make_unique<llvm::Logger>(std::move(OutStream), InputSpecs, Advice,
                                    /*IncludeReward=*/false, Advice);
   }
-  // Just like in the no inference case, this will allocate an appropriately
-  // sized buffer.
-  for (size_t I = 0; I < InputSpecs.size(); ++I)
-    setUpBufferForTensor(I, InputSpecs[I], nullptr);
+  
   Log->flush();
 }
 
@@ -52,6 +53,10 @@ InteractiveModelRunner::~InteractiveModelRunner() {
 }
 
 void *InteractiveModelRunner::evaluateUntyped() {
+  if (!Log)
+    llvm::report_fatal_error(
+        "InteractiveModelRunner used without successfully opening "
+        "its communication channels");
   Log->startObservation();
   for (size_t I = 0; I < InputSpecs.size(); ++I)
     Log->logTensorValue(I, reinterpret_cast<const char *>(getTensorUntyped(I)));

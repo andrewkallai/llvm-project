@@ -6,12 +6,11 @@
 // RUN: cp %S/../../../../../llvm/lib/Analysis/models/interactive_host.py %t.rundir
 // RUN: cp %S/Inputs/interactive_main.py %t.rundir
 // RUN: %python %t.rundir/interactive_main.py %t.channel-basename \
-// RUN:    mlir-opt --inline='enable-ml-inliner=release' -interactive-model-runner-echo-reply \
-// RUN:    -inliner-interactive-channel-base=%t.channel-basename %S/Inputs/test-module.mlir -o /dev/null | FileCheck %s
+// RUN:    mlir-opt --inline='enable-ml-inliner=release inliner-interactive-channel-base=%t.channel-basename' -interactive-model-runner-echo-reply \
+// RUN:    %S/Inputs/test-module.mlir -o /dev/null | FileCheck %s
 // RUN: %python %t.rundir/interactive_main.py %t.channel-basename \
-// RUN:    mlir-opt --inline='enable-ml-inliner=release' -interactive-model-runner-echo-reply \
-// RUN:    -inliner-interactive-include-default \
-// RUN:    -inliner-interactive-channel-base=%t.channel-basename %S/Inputs/test-module.mlir -o /dev/null | FileCheck %s -check-prefixes=CHECK,CHECK-DEFAULT
+// RUN:    mlir-opt --inline='enable-ml-inliner=release inliner-interactive-channel-base=%t.channel-basename inliner-interactive-include-default=true' -interactive-model-runner-echo-reply \
+// RUN:    %S/Inputs/test-module.mlir -o /dev/null | FileCheck %s -check-prefixes=CHECK,CHECK-DEFAULT
 
 
 // It'd be nice if we had stdout and stderr interleaved, but we don't, so

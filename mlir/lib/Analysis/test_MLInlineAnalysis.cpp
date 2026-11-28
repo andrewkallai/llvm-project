@@ -150,6 +150,15 @@ getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
     return nullptr;
   auto RunnerFactory = [&](const std::vector<llvm::TensorSpec> &InputFeatures)
       -> std::unique_ptr<MLModelRunner> {
+//     llvm::errs() << "InputFeatures size: " << InputFeatures.size() << "\n";
+
+// for (size_t i = 0; i < InputFeatures.size(); ++i)
+//   llvm::errs() << i << ": " << InputFeatures[i].name() << "\n";
+
+// llvm::errs() << "callee_basic_block_count index: "
+//              << static_cast<size_t>(
+//                     llvm::FeatureIndex::callee_basic_block_count)
+//              << "\n";
     return createReleaseModeModelRunner<CompiledModelType>(
         *moduleOp->getContext(), InputFeatures, llvm::DecisionName,
         Opts.inliner_interactive_channel_base.str(), llvm::InlineDecisionSpec,
