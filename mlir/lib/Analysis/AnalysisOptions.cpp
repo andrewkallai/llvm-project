@@ -55,11 +55,11 @@ using namespace mlir;
 
 // } // namespace
 
-static llvm::ManagedStatic<mlir::AnalysisOptions> clOptions;
+// static llvm::ManagedStatic<mlir::AnalysisOptions> clOptions;
 
-void mlir::registerAnalysisCLOptions() {
-  (void)*clOptions;
-}
+// void mlir::registerAnalysisCLOptions() {
+//   (void)*clOptions;
+// }
 
 // const AnalysisOptions &mlir::getAnalysisOptions() {
 //   assert(clOptions.isConstructed() &&
@@ -78,6 +78,7 @@ void mlir::registerAnalysisCLOptions() {
 
 
 // llvm::ManagedStatic<AnalysisOptions> clOptions;
+llvm::ManagedStatic<AnalysisOptions> options;
 
 // static llvm::opt::RegisterLibraryOptions<mlir::AnalysisOptions>
     // Registration;
@@ -87,36 +88,42 @@ void mlir::registerAnalysisCLOptions() {
 //   (void)*clOptions;
 // }
 
+void mlir::setAnalysisOptions(const AnalysisOptions &Opts) {
+  *options = Opts;
+}
+const AnalysisOptions &mlir::getAnalysisOptions() {
+  return *options;
+}
 // const AnalysisOptions &mlir::getAnalysisOptions() {
 //   return *clOptions;
 // }
 
 
-// const AnalysisOptions &mlir::getAnalysisOptions(Operation &op) {
-//   return getAnalysisOptions();
-// }
-// const AnalysisOptions &mlir::getAnalysisOptions(ModuleOp &moduleOp) {
-//   return getAnalysisOptions();
-// }
-
-// const AnalysisOptions &mlir::getAnalysisOptions(MLIRContext &Ctx) {
-//   return getAnalysisOptions();
-// }
-
-
-
-const mlir::AnalysisOptions &
-mlir::getAnalysisOptions(Operation &op) {
-  return getAnalysisOptions(*op.getContext());
-}
-
-const mlir::AnalysisOptions &
-mlir::getAnalysisOptions(ModuleOp &moduleOp) {
-  return getAnalysisOptions(*moduleOp.getContext());
-}
-
-const mlir::AnalysisOptions &
-mlir::getAnalysisOptions(MLIRContext &ctx) {
-  (void)ctx;
+const AnalysisOptions &mlir::getAnalysisOptions(Operation &op) {
   return getAnalysisOptions();
 }
+const AnalysisOptions &mlir::getAnalysisOptions(ModuleOp &moduleOp) {
+  return getAnalysisOptions();
+}
+
+const AnalysisOptions &mlir::getAnalysisOptions(MLIRContext &Ctx) {
+  return getAnalysisOptions();
+}
+
+
+
+// const mlir::AnalysisOptions &
+// mlir::getAnalysisOptions(Operation &op) {
+//   return getAnalysisOptions(*op.getContext());
+// }
+
+// const mlir::AnalysisOptions &
+// mlir::getAnalysisOptions(ModuleOp &moduleOp) {
+//   return getAnalysisOptions(*moduleOp.getContext());
+// }
+
+// const mlir::AnalysisOptions &
+// mlir::getAnalysisOptions(MLIRContext &ctx) {
+//   (void)ctx;
+//   return getAnalysisOptions();
+// }

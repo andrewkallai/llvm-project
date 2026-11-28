@@ -35,7 +35,6 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/test_MLInlineAnalysis.h"
-#include "mlir/Analysis/AnalysisOptions.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"
@@ -48,6 +47,8 @@
 #include "mlir/IR/Remarks.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
+// #include "mlir/Analysis/AnalysisOptions.h"
+
 
 
 
@@ -137,11 +138,12 @@ void setSelectedMLGOModel(EmitCModelChoice model) {
 
 std::unique_ptr<MLInlineAdvisor>
 getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
-                            std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice) {
+                            std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice){
+                            // AnalysisOptions Opts) {
                             // bool defaultAdvice) {
   const AnalysisOptions &Opts = getAnalysisOptions(*moduleOp);
-  LDBG() << "FAIL TWO";
-  LDBG() << Opts.inliner_interactive_channel_base;
+  // LDBG() << "FAIL TWO";
+  // LDBG() << Opts.inliner_interactive_channel_base;
   if (!isReleaseModelValid<CompiledModelType>(
           // Opts.inliner_interactive_channel_base, getSelectedMLGOModel()))
           Opts.inliner_interactive_channel_base, SelectedMLGOModel))
@@ -227,10 +229,11 @@ MLInlineAnalysis::MLInlineAnalysis(Operation *op, AnalysisManager &AM)
 // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
 // std::unique_ptr<MLInlineAdvisor>
 void
-MLInlineAnalysis::getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice, bool printInlineAdvisor) {
+MLInlineAnalysis::getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice, bool printInlineAdvisor, AnalysisOptions Opts) {
   setSelectedMLGOModel(model); 
   // auto releaseModeAdvisorFunc = [this](bool defaultAdvice) {
-
+            setAnalysisOptions(Opts);
+            // auto advisor = getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice), Opts);
             auto advisor = getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice));
             setMLInlineAdvisor(std::move(advisor));
             setPrintInlineAdvisor(printInlineAdvisor);
@@ -246,10 +249,13 @@ MLInlineAnalysis::getReleaseModeAdvisorFunction(EmitCModelChoice model, std::fun
 // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
 // std::unique_ptr<MLInlineAdvisor>
 void
-MLInlineAnalysis::getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice, bool printInlineAdvisor) {
+MLInlineAnalysis::getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice, bool printInlineAdvisor,
+AnalysisOptions Opts) {
   setSelectedMLGOModel(model); 
   // auto developmentModeAdvisorFunc = [this](bool defaultAdvice) {
           //  return llvm::getDevelopmentModeAdvisor(moduleOp, AM, defaultAdvice);
+                      // auto advisor = getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice), Opts);
+                      setAnalysisOptions(Opts);
                       auto advisor = getReleaseModeAdvisor(moduleOp, AM, std::move(getDefaultAdvice));
                       setMLInlineAdvisor(std::move(advisor));
                       setPrintInlineAdvisor(printInlineAdvisor);

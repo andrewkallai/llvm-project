@@ -226,6 +226,25 @@ void InlinerPass::runOnOperation() {
   // as the callgraph will need to resolve references.
   Operation *op = getOperation();
 
+  AnalysisOptions opts;
+  opts.inliner_interactive_channel_base =
+      inlinerInteractiveChannelBase;
+  opts.inliner_interactive_include_default =
+      inlinerInteractiveIncludeDefault;
+  opts.ml_advisor_keep_fpi_cache = mlAdvisorKeepFpiCache;
+  opts.ml_advisor_size_increase_threshold =
+      mlAdvisorSizeIncreaseThreshold;
+  opts.ml_inliner_model_selector = mlInlinerModelSelector;
+  opts.ml_inliner_skip_policy = mlInlinerSkipPolicy;
+  opts.ml_inliner_stop_immediately = mlInlinerStopImmediately;
+//   LDBG() << "Interactive channel: " << inlinerInteractiveChannelBase;
+// LDBG() << "Include default: " << inlinerInteractiveIncludeDefault;
+// LDBG() << "Keep FPI cache: " << mlAdvisorKeepFpiCache;
+// LDBG() << "Size threshold: " << mlAdvisorSizeIncreaseThreshold;
+// LDBG() << "Model selector: " << mlInlinerModelSelector;
+// LDBG() << "Skip policy: " << static_cast<int>(mlInlinerSkipPolicy);
+// LDBG() << "Stop immediately: " << mlInlinerStopImmediately;
+
   bool mandatoryOnly = mandatoryInliningFirst.getValue();
 
   if (!op->hasTrait<OpTrait::SymbolTable>()) {
@@ -261,7 +280,7 @@ void InlinerPass::runOnOperation() {
         // return isProfitableToInline(call, inliningThreshold, advisorFunction, printInlineAdvisor.getValue());
       // };
       // advisor= analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb);
-      analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb, printInlineAdvisor);
+      analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb, printInlineAdvisor, opts);
       // advisor = analysis.getMLInlineAdvisor();
       profitabilityCb = [this, &mandatoryOnly](const Inliner::ResolvedCall &call) {
         return isProfitableToInline(call, getAnalysisManager(), mandatoryOnly);
@@ -282,7 +301,7 @@ void InlinerPass::runOnOperation() {
         // return isProfitableToInline(call, inliningThreshold, advisorFunction, printInlineAdvisor.getValue());
       // };
       // advisor = analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb);
-      analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb, printInlineAdvisor);
+      analysis.getDevelopmentModeAdvisorFunction(mlirMlgoModel.getValue(), profitabilityCb, printInlineAdvisor, opts);
       // advisor = analysis.getMLInlineAdvisor();
       profitabilityCb = [this, &mandatoryOnly](const Inliner::ResolvedCall &call) {
         return isProfitableToInline(call, getAnalysisManager(), mandatoryOnly);

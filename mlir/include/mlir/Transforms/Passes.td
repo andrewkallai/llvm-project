@@ -369,6 +369,7 @@ def InlinerPass : Pass<"inline"> {
        Option<"mandatoryInliningFirst", "mandatory-inlining-first", "bool",
        /*default=*/"false",
        "Perform mandatory inlinings module-wide, before performing inlining">,
+
        Option<"inlinerInteractiveChannelBase",
        "inliner-interactive-channel-base", "std::string",
        /*default=*/"\"\"",
@@ -413,6 +414,7 @@ def InlinerPass : Pass<"inline"> {
           "ml-inliner-stop-immediately", "bool",
           /*default=*/"false",
           "Stop ML inlining immediately">
+
   ];
 }
 

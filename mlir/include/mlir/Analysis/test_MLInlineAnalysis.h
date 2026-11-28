@@ -25,6 +25,7 @@
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Analysis/MLModelRunner.h"
 #include "mlir/Transforms/Inliner.h"
+#include "mlir/Analysis/AnalysisOptions.h"
 
 
 
@@ -67,13 +68,13 @@ public:
   // std::unique_ptr<MLInlineAdvisor>
   void
   getReleaseModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice,
-    bool printInlineAdvisor);
+    bool printInlineAdvisor, AnalysisOptions Opts);
 
   // std::function<std::unique_ptr<MLInlineAdvisor>(bool)>
   // std::unique_ptr<MLInlineAdvisor>
   void
   getDevelopmentModeAdvisorFunction(EmitCModelChoice model, std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice,
-    bool printInlineAdvisor);
+    bool printInlineAdvisor, AnalysisOptions Opts);
 
   void setMLInlineAdvisor(std::unique_ptr<MLInlineAdvisor> mlInlineAdvisor){ advisor = std::move(mlInlineAdvisor); }
   MLInlineAdvisor *getMLInlineAdvisor(){ return advisor.get(); }
@@ -134,6 +135,7 @@ public:
   std::unique_ptr<MLInlineAdvisor>
   getReleaseModeAdvisor(Operation *moduleOp, AnalysisManager &AM,
                       std::function<bool(const Inliner::ResolvedCall &)> getDefaultAdvice);
+                      //  AnalysisOptions Opts);
                       // bool defaultAdvice);
 
   // std::unique_ptr<MLInlineAdvisor>

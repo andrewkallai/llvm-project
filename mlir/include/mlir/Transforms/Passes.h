@@ -23,6 +23,7 @@
 #include "llvm/Support/Debug.h"
 // #include "llvm/Analysis/InlineAdvisor.h"
 #include "mlir/Analysis/test_MLInlineAnalysis.h"
+#include "mlir/Analysis/AnalysisOptions.h"
 #include <limits>
 #include <memory>
 

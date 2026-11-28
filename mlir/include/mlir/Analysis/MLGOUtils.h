@@ -31,6 +31,8 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Analysis/InteractiveModelRunner.h"
 #include "mlir/Analysis/ReleaseModeModelRunner.h"
+#include "llvm/Support/DebugLog.h"
+
 
 
 namespace mlir {
@@ -54,6 +56,10 @@ template <class CompiledModelType, class EnumType>
 bool isReleaseModelValid(llvm::StringRef InteractiveChannelBaseName,
                          EnumType SelectedModel,
                          EnumType DefaultModelVal = EnumType::Default) {
+  // LDBG() << "FAILURE DEBUG";
+  // LDBG() << isEmbeddedModelEvaluatorValid<CompiledModelType>();
+  // LDBG() << !InteractiveChannelBaseName.empty();
+  // LDBG() << (SelectedModel != DefaultModelVal);
   return isEmbeddedModelEvaluatorValid<CompiledModelType>() ||
          !InteractiveChannelBaseName.empty() ||
          SelectedModel != DefaultModelVal;

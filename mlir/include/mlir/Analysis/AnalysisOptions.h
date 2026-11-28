@@ -59,6 +59,17 @@ enum class StencilMergePolicy { Off, Auto, Force };
 
 enum class SkipMLPolicyCriteria { Never, IfCallerIsNotCold };
 
+// struct AnalysisOptions {
+//   std::string inliner_interactive_channel_base;
+//   bool inliner_interactive_include_default = false;
+//   bool ml_advisor_keep_fpi_cache = false;
+//   float ml_advisor_size_increase_threshold = 2.0f;
+//   std::string ml_inliner_model_selector;
+//   SkipMLPolicyCriteria ml_inliner_skip_policy =
+//       SkipMLPolicyCriteria::Never;
+//   bool ml_inliner_stop_immediately = false;
+// };
+
 } // namespace llvm
 
 #define OPTIONS_STRUCT_DECL
@@ -84,9 +95,12 @@ enum class SkipMLPolicyCriteria { Never, IfCallerIsNotCold };
 
 namespace mlir {
 
+
+
 /// Register command-line options used by MLIR analyses.
 void registerAnalysisCLOptions();
 
+void setAnalysisOptions(const AnalysisOptions &Opts);
 const AnalysisOptions &getAnalysisOptions();
 
 const AnalysisOptions &getAnalysisOptions(Operation &op);
